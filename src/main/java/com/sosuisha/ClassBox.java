@@ -22,7 +22,10 @@ public final class ClassBox implements SvgElement {
     private static final int PADDING_Y  = 4;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int MIN_WIDTH  = 100;
-    private static final double SKETCH_MAX = 2.0;
+    // ゆらぎ上限: コンテンツの充実度に応じて段階的に大きくする
+    private static final double SKETCH_MAX_NONE = 1.0;
+    private static final double SKETCH_MAX_SOME = 1.5;
+    private static final double SKETCH_MAX_FULL = 2.0;
 
     private final String name;
     private final List<String> fields;
@@ -120,13 +123,14 @@ public final class ClassBox implements SvgElement {
         int w = width();
         int h = height();
         var rng = createRandom();
+        double sketchMax = sketchMax();
         var content = new StringBuilder();
 
         int ch = 0;
         ch += appendNameCompartment(content, w, ch);
-        content.append(sketchyLine(0, ch, w, ch, rng));
+        content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
         ch += appendTextCompartment(content, fields, w, ch);
-        content.append(sketchyLine(0, ch, w, ch, rng));
+        content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
         appendTextCompartment(content, methods, w, ch);
 
         var sb = new StringBuilder();
@@ -135,21 +139,31 @@ public final class ClassBox implements SvgElement {
         } else {
             sb.append("<g data-diagram-draw=\"box\" data-diagram-draw-type=\"class\" data-diagram-draw-name=\"%s\">".formatted(name));
         }
-        sb.append(sketchyLine(0, 0, w, 0, rng));
-        sb.append(sketchyLine(w, 0, w, h, rng));
-        sb.append(sketchyLine(w, h, 0, h, rng));
-        sb.append(sketchyLine(0, h, 0, 0, rng));
+        sb.append(sketchyLine(0, 0, w, 0, rng, sketchMax));
+        sb.append(sketchyLine(w, 0, w, h, rng, sketchMax));
+        sb.append(sketchyLine(w, h, 0, h, rng, sketchMax));
+        sb.append(sketchyLine(0, h, 0, 0, rng, sketchMax));
         sb.append(content);
         sb.append("</g>");
         return sb.toString();
+    }
+
+    private double sketchMax() {
+        if (!fields.isEmpty() && !methods.isEmpty()) {
+            return SKETCH_MAX_FULL;
+        }
+        if (!fields.isEmpty() || !methods.isEmpty()) {
+            return SKETCH_MAX_SOME;
+        }
+        return SKETCH_MAX_NONE;
     }
 
     private Random createRandom() {
         return new Random(Objects.hash(name, fields, methods));
     }
 
-    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng) {
-        double wobble = rng.nextDouble() * SKETCH_MAX * 2 - SKETCH_MAX;
+    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng, double sketchMax) {
+        double wobble = rng.nextDouble() * sketchMax * 2 - sketchMax;
         int mx = (x1 + x2) / 2;
         int my = (y1 + y2) / 2;
         double cp1x = (x1 + mx) / 2.0;

@@ -2,6 +2,7 @@ package com.sosuisha;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 
 /**
  * UMLクラスボックスを表すオブジェクト。
@@ -10,16 +11,18 @@ import java.util.Objects;
  * 内容（名前・フィールド・メソッド）は構築後イミュータブル。
  * 描画位置は {@link #setPosition(int, int)} で設定する。
  * 幅・高さはコンテンツから自動計算される。
+ * 輪郭線・区切り線はコンテンツのハッシュを種としたゆらぎを持つ。
  */
 public final class ClassBox implements SvgElement {
 
-    private static final int FONT_SIZE = 14;
-    private static final int ASCENT    = FONT_SIZE * 4 / 5;
-    private static final int LINE_GAP  = 4;
-    private static final int PADDING_X = 8;
-    private static final int PADDING_Y = 4;
+    private static final int FONT_SIZE  = 14;
+    private static final int ASCENT     = FONT_SIZE * 4 / 5;
+    private static final int LINE_GAP   = 4;
+    private static final int PADDING_X  = 8;
+    private static final int PADDING_Y  = 4;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
-    private static final int MIN_WIDTH = 100;
+    private static final int MIN_WIDTH  = 100;
+    private static final double SKETCH_MAX = 2.0;
 
     private final String name;
     private final List<String> fields;
@@ -115,14 +118,16 @@ public final class ClassBox implements SvgElement {
     @Override
     public String draw() {
         int w = width();
+        int h = height();
+        var rng = createRandom();
         var content = new StringBuilder();
 
-        int h = 0;
-        h += appendNameCompartment(content, w, h);
-        appendDivider(content, w, h);
-        h += appendTextCompartment(content, fields, w, h);
-        appendDivider(content, w, h);
-        h += appendTextCompartment(content, methods, w, h);
+        int ch = 0;
+        ch += appendNameCompartment(content, w, ch);
+        content.append(sketchyLine(0, ch, w, ch, rng));
+        ch += appendTextCompartment(content, fields, w, ch);
+        content.append(sketchyLine(0, ch, w, ch, rng));
+        appendTextCompartment(content, methods, w, ch);
 
         var sb = new StringBuilder();
         if (x != 0 || y != 0) {
@@ -130,10 +135,36 @@ public final class ClassBox implements SvgElement {
         } else {
             sb.append("<g data-diagram-draw=\"box\" data-diagram-draw-type=\"class\" data-diagram-draw-name=\"%s\">".formatted(name));
         }
-        sb.append("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" fill=\"none\" stroke=\"black\"/>".formatted(w, h));
+        sb.append(sketchyLine(0, 0, w, 0, rng));
+        sb.append(sketchyLine(w, 0, w, h, rng));
+        sb.append(sketchyLine(w, h, 0, h, rng));
+        sb.append(sketchyLine(0, h, 0, 0, rng));
         sb.append(content);
         sb.append("</g>");
         return sb.toString();
+    }
+
+    private Random createRandom() {
+        return new Random(Objects.hash(name, fields, methods));
+    }
+
+    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng) {
+        double wobble = rng.nextDouble() * SKETCH_MAX * 2 - SKETCH_MAX;
+        int mx = (x1 + x2) / 2;
+        int my = (y1 + y2) / 2;
+        double cp1x = (x1 + mx) / 2.0;
+        double cp1y = (y1 + my) / 2.0;
+        double cp2x = (mx + x2) / 2.0;
+        double cp2y = (my + y2) / 2.0;
+        if (Math.abs(x2 - x1) >= Math.abs(y2 - y1)) {
+            cp1y += wobble;
+            cp2y -= wobble;
+        } else {
+            cp1x += wobble;
+            cp2x -= wobble;
+        }
+        return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"black\"/>".formatted(
+            x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2);
     }
 
     private static int compartmentHeight(int lineCount) {
@@ -147,10 +178,6 @@ public final class ClassBox implements SvgElement {
         int textY = startY + PADDING_Y + ASCENT;
         sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(width / 2, textY, FONT_SIZE, name));
         return compartmentHeight(1);
-    }
-
-    private static void appendDivider(StringBuilder sb, int width, int y) {
-        sb.append("<line x1=\"0\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"black\"/>".formatted(y, width, y));
     }
 
     private int appendTextCompartment(StringBuilder sb, List<String> lines, int width, int startY) {

@@ -58,15 +58,35 @@ class ClassBoxTest {
     }
 
     @Test
-    void drawContainsTwoHorizontalLines() {
+    void drawContainsSixPaths() {
+        // 4辺（rect代替）+ 2本の区切り線 = 6
         var result = new ClassBox("MyClass").draw();
-        assertEquals(2, result.split("<line", -1).length - 1);
+        assertEquals(6, result.split("<path", -1).length - 1);
     }
 
     @Test
-    void drawContainsOuterRect() {
+    void drawPathsUseBezierCurves() {
         var result = new ClassBox("MyClass").draw();
-        assertTrue(result.contains("<rect"));
+        assertTrue(result.contains(" Q "));
+    }
+
+    @Test
+    void drawPathsHaveDoubleWobble() {
+        // 各pathに Q が2つ（S字カーブ）= 6paths × 2 = 12個
+        var result = new ClassBox("MyClass").draw();
+        assertEquals(12, result.split(" Q ", -1).length - 1);
+    }
+
+    @Test
+    void drawContainsNoRectElement() {
+        var result = new ClassBox("MyClass").draw();
+        assertFalse(result.contains("<rect"));
+    }
+
+    @Test
+    void drawContainsNoLineElement() {
+        var result = new ClassBox("MyClass").draw();
+        assertFalse(result.contains("<line"));
     }
 
     @Test
@@ -129,8 +149,7 @@ class ClassBoxTest {
     void emptyCompartmentHeightIsPaddingOnly() {
         // 空コンパートメント高さ = PADDING_Y * 2 = 8
         // 合計 = nameHeight(22) + fields(8) + methods(8) = 38
-        var result = new ClassBox("MyClass").draw();
-        assertTrue(result.contains("height=\"38\""));
+        assertEquals(38, new ClassBox("MyClass").height());
     }
 
     @Test
@@ -141,5 +160,12 @@ class ClassBoxTest {
         // 2行目 baseline = 37 + FONT_SIZE + LINE_GAP = 37 + 14 + 4 = 55
         var result = new ClassBox("C", List.of("a", "b"), List.of()).draw();
         assertTrue(result.contains("y=\"55\""));
+    }
+
+    @Test
+    void sameClassBoxProducesSameOutput() {
+        var result1 = new ClassBox("MyClass").draw();
+        var result2 = new ClassBox("MyClass").draw();
+        assertEquals(result1, result2);
     }
 }

@@ -81,7 +81,7 @@ class DiagramDrawExampleTest {
                 .add(order)
                 .add(customer)
                 .add(orderItem)
-                .add(new Dependency(order, customer, DependencyType.COMPOSITION))
+                .add(new Dependency(order, customer, DependencyType.AGGREGATION))
                 .add(new Dependency(order, orderItem, DependencyType.COMPOSITION))
                 .build();
 

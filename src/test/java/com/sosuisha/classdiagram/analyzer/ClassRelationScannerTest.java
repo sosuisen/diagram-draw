@@ -27,4 +27,23 @@ class ClassRelationScannerTest {
         var result = new ClassRelationScanner().scan(CLASS_ROOT, "com.does.not.exist");
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void scanDetectsAggregationForConstructorInjectedField() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        assertTrue(relations.stream().anyMatch(r ->
+            r.sourceClass().equals(FIXTURE_PKG + ".FixtureOrder") &&
+            r.targetClass().equals(FIXTURE_PKG + ".FixtureCustomer") &&
+            r.type() == RelationType.AGGREGATION &&
+            !r.isMany()
+        ));
+    }
+
+    @Test
+    void scanReturnsNoRelationsForPojoWithoutSamePackageFields() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        assertTrue(relations.stream().noneMatch(r ->
+            r.sourceClass().equals(FIXTURE_PKG + ".FixtureItem")
+        ));
+    }
 }

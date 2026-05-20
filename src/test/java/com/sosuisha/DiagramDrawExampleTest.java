@@ -11,9 +11,13 @@ class DiagramDrawExampleTest {
 
     @Test
     void outputExampleSvgFile() throws IOException {
+        var box1 = new ClassBox("ClassA");
+        box1.setPosition(50, 60);
+        var box2 = new ClassBox("ClassB");
+        box2.setPosition(300, 60);
         var svg = new SVGBuilder(500, 200)
-                .add(new Box(50, 60, 150, 80))
-                .add(new Box(300, 60, 150, 80))
+                .add(box1)
+                .add(box2)
                 .build();
 
         var outputDir = Path.of("target/svg-output");

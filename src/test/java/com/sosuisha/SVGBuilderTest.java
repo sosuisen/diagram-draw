@@ -1,6 +1,7 @@
 package com.sosuisha;
 
 import org.junit.jupiter.api.Test;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,23 +19,23 @@ class SVGBuilderTest {
     @Test
     void buildContainsRectAfterAddingBox() {
         var builder = new SVGBuilder(800, 600);
-        builder.add(new Box(10, 20, 100, 50));
+        builder.add(new ClassBox("MyClass"));
         assertTrue(builder.build().contains("<rect"));
     }
 
     @Test
-    void buildContainsTwoRectsAfterAddingTwoBoxes() {
+    void buildContainsTwoClassBoxesAfterAddingTwo() {
         var builder = new SVGBuilder(800, 600);
-        builder.add(new Box(10, 20, 100, 50));
-        builder.add(new Box(50, 60, 80, 40));
+        builder.add(new ClassBox("MyClass"));
+        builder.add(new ClassBox("OtherClass"));
         var result = builder.build();
-        assertEquals(2, result.split("fill=\"none\"", -1).length - 1);
+        assertEquals(2, result.split("data-diagram-draw=\"box\"", -1).length - 1);
     }
 
     @Test
     void addReturnsSvgBuilder() {
         var builder = new SVGBuilder(800, 600);
-        var result = builder.add(new Box(10, 20, 100, 50));
+        var result = builder.add(new ClassBox("MyClass"));
         assertSame(builder, result);
     }
 

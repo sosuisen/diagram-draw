@@ -1,0 +1,56 @@
+<h2>Within-layer box alignment</h2>
+<p class="subtitle">How should multiple ClassBoxes in the same layer be positioned horizontally?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg width="340" height="120" style="display:block;margin:auto">
+        <!-- Layer 0: A (single, centered) -->
+        <rect x="120" y="8" width="100" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="170" y="31" font-size="13" text-anchor="middle" fill="#333">Order</text>
+        <!-- Layer 1: B C D left-aligned -->
+        <rect x="10" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="55" y="95" font-size="13" text-anchor="middle" fill="#333">Customer</text>
+        <rect x="120" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="165" y="95" font-size="13" text-anchor="middle" fill="#333">Item</text>
+        <rect x="230" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="275" y="95" font-size="13" text-anchor="middle" fill="#333">Payment</text>
+        <!-- arrows -->
+        <line x1="170" y1="44" x2="55" y2="72" stroke="#999" stroke-width="1"/>
+        <line x1="170" y1="44" x2="165" y2="72" stroke="#999" stroke-width="1"/>
+        <line x1="170" y1="44" x2="275" y2="72" stroke="#999" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A — Left-aligned</h3>
+      <p>Boxes start from <code>canvasPaddingX</code>, spaced by <code>horizontalGap</code>. Simple and predictable.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg width="340" height="120" style="display:block;margin:auto">
+        <!-- Layer 0: A centered -->
+        <rect x="120" y="8" width="100" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="170" y="31" font-size="13" text-anchor="middle" fill="#333">Order</text>
+        <!-- Layer 1: B C D centered as group -->
+        <rect x="25" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="70" y="95" font-size="13" text-anchor="middle" fill="#333">Customer</text>
+        <rect x="125" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="170" y="95" font-size="13" text-anchor="middle" fill="#333">Item</text>
+        <rect x="225" y="72" width="90" height="36" fill="none" stroke="#555" stroke-width="1.5" rx="2"/>
+        <text x="270" y="95" font-size="13" text-anchor="middle" fill="#333">Payment</text>
+        <!-- arrows -->
+        <line x1="170" y1="44" x2="70" y2="72" stroke="#999" stroke-width="1"/>
+        <line x1="170" y1="44" x2="170" y2="72" stroke="#999" stroke-width="1"/>
+        <line x1="170" y1="44" x2="270" y2="72" stroke="#999" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B — Centered</h3>
+      <p>Each layer's group of boxes is centered on the canvas. Symmetric, more diagram-like.</p>
+    </div>
+  </div>
+
+</div>

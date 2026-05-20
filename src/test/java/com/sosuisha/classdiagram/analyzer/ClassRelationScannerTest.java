@@ -60,4 +60,18 @@ class ClassRelationScannerTest {
             r.isMany()
         ));
     }
+
+    @Test
+    void scanDetectsRelationFromSubpackage() {
+        var subPkg = FIXTURE_PKG + ".sub";
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        assertTrue(relations.stream().anyMatch(r ->
+            r.sourceClassInfo().packageName().equals(subPkg) &&
+            r.sourceClassInfo().simpleName().equals("FixtureSubOrder") &&
+            r.targetClassInfo().packageName().equals(FIXTURE_PKG) &&
+            r.targetClassInfo().simpleName().equals("FixtureItem") &&
+            r.type() == DependencyType.COMPOSITION &&
+            r.isMany()
+        ));
+    }
 }

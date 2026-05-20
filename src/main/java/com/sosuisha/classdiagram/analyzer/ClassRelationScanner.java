@@ -2,16 +2,16 @@ package com.sosuisha.classdiagram.analyzer;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.FieldModel;
+import java.lang.classfile.Signature;
+import java.lang.constant.ClassDesc;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import com.sosuisha.classdiagram.DependencyType;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -20,16 +20,14 @@ import java.util.Set;
 /**
  * コンパイル済みクラスファイルをリフレクションで分析し、コンポジション・集約関係を返すスキャナー。
  *
- * <p>指定パッケージの直下にある {@code .class} ファイルを対象とし、サブパッケージは対象外。
+ * <p>指定パッケージおよびサブパッケージの {@code .class} ファイルを対象とする。
  * {@link #scan(Path, String)} が {@link ClassRelation} のリストを返す。
  */
 public class ClassRelationScanner {
 
     /**
-     * 指定パッケージ内のクラスを分析し、コンポジション・集約関係を返す。
+     * 指定パッケージおよびサブパッケージ内のクラスを分析し、コンポジション・集約関係を返す。
      *
-     * @apiNote サブパッケージは対象外。{@code com.example} を指定した場合、
-     *          {@code com.example.sub} 以下のクラスは分析されない。
      * @param classRoot コンパイル済みクラスのルートディレクトリ
      * @param packageName 分析対象パッケージ名
      * @return 検出された関係のリスト
@@ -44,7 +42,7 @@ public class ClassRelationScanner {
             return List.of();
         }
 
-        var targetClassNames = collectClassNames(packageDir, packageName);
+        var targetClassNames = collectClassNames(classRoot, packageDir);
         if (targetClassNames.isEmpty()) {
             return List.of();
         }
@@ -55,30 +53,31 @@ public class ClassRelationScanner {
     private List<ClassRelation> analyzeRelations(Path classRoot, Set<String> targetClassNames) {
         var relations = new ArrayList<ClassRelation>();
 
-        try (var loader = new URLClassLoader(new URL[]{toUrl(classRoot)}, getClass().getClassLoader())) {
-            for (var className : targetClassNames) {
-                var clazz = loadClass(className, loader);
-                if (clazz == null) continue;
-
-                var constructorParamTypeNames = collectConstructorParamTypeNames(clazz);
-
-                for (var field : clazz.getDeclaredFields()) {
-                    var resolved = resolveFieldTarget(field, targetClassNames);
-                    if (resolved == null) continue;
-
-                    var type = constructorParamTypeNames.contains(resolved.targetClassName())
-                        ? DependencyType.AGGREGATION
-                        : DependencyType.COMPOSITION;
-                    relations.add(new ClassRelation(
-                        ClassInfo.fromFullyQualifiedName(className),
-                        ClassInfo.fromFullyQualifiedName(resolved.targetClassName()),
-                        type,
-                        resolved.isMany()
-                    ));
-                }
+        for (var className : targetClassNames) {
+            var classFilePath = classRoot.resolve(className.replace('.', '/') + ".class");
+            ClassModel model;
+            try {
+                model = ClassFile.of().parse(classFilePath);
+            } catch (IOException e) {
+                continue;
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+
+            var constructorParamTypeNames = collectConstructorParamTypeNames(model);
+
+            for (var field : model.fields()) {
+                var resolved = resolveFieldTarget(field, targetClassNames);
+                if (resolved == null) continue;
+
+                var type = constructorParamTypeNames.contains(resolved.targetClassName())
+                    ? DependencyType.AGGREGATION
+                    : DependencyType.COMPOSITION;
+                relations.add(new ClassRelation(
+                    ClassInfo.fromFullyQualifiedName(className),
+                    ClassInfo.fromFullyQualifiedName(resolved.targetClassName()),
+                    type,
+                    resolved.isMany()
+                ));
+            }
         }
 
         return List.copyOf(relations);
@@ -86,17 +85,35 @@ public class ClassRelationScanner {
 
     private record FieldTarget(String targetClassName, boolean isMany) {}
 
-    private static FieldTarget resolveFieldTarget(Field field, Set<String> targetClassNames) {
-        var fieldTypeName = field.getType().getName();
+    private static final Set<String> COLLECTION_TYPES = Set.of(
+        "java.util.Collection",
+        "java.util.List",
+        "java.util.Set",
+        "java.util.Queue",
+        "java.util.Deque",
+        "java.util.ArrayList",
+        "java.util.LinkedList",
+        "java.util.HashSet",
+        "java.util.LinkedHashSet",
+        "java.util.TreeSet",
+        "java.util.ArrayDeque"
+    );
+
+    private static FieldTarget resolveFieldTarget(FieldModel field, Set<String> targetClassNames) {
+        var fieldTypeName = classDescToBinaryName(field.fieldTypeSymbol());
         if (targetClassNames.contains(fieldTypeName)) {
             return new FieldTarget(fieldTypeName, false);
         }
-        if (Collection.class.isAssignableFrom(field.getType())) {
-            var genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType pt) {
-                var args = pt.getActualTypeArguments();
-                if (args.length == 1 && args[0] instanceof Class<?> argClass) {
-                    var argName = argClass.getName();
+        if (COLLECTION_TYPES.contains(fieldTypeName)) {
+            var sigAttr = field.findAttribute(Attributes.signature());
+            if (sigAttr.isPresent()) {
+                var sig = sigAttr.get().asTypeSignature();
+                if (sig instanceof Signature.ClassTypeSig classSig
+                    && classSig.typeArgs().size() == 1
+                    && classSig.typeArgs().get(0) instanceof Signature.TypeArg.Bounded bounded
+                    && bounded.wildcardIndicator() == Signature.TypeArg.Bounded.WildcardIndicator.NONE
+                    && bounded.boundType() instanceof Signature.ClassTypeSig argSig) {
+                    var argName = internalNameToBinary(argSig.className());
                     if (targetClassNames.contains(argName)) {
                         return new FieldTarget(argName, true);
                     }
@@ -106,44 +123,51 @@ public class ClassRelationScanner {
         return null;
     }
 
-    private static Set<String> collectConstructorParamTypeNames(Class<?> clazz) {
+    private static Set<String> collectConstructorParamTypeNames(ClassModel model) {
         var names = new HashSet<String>();
-        for (var constructor : clazz.getDeclaredConstructors()) {
-            for (var paramType : constructor.getParameterTypes()) {
-                names.add(paramType.getName());
+        for (var method : model.methods()) {
+            if (!method.methodName().stringValue().equals("<init>")) continue;
+            var desc = method.methodTypeSymbol();
+            for (int i = 0; i < desc.parameterCount(); i++) {
+                names.add(classDescToBinaryName(desc.parameterType(i)));
             }
         }
         return names;
     }
 
-    private static Class<?> loadClass(String className, ClassLoader loader) {
-        try {
-            return Class.forName(className, false, loader);
-        } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            return null;
+    private static String classDescToBinaryName(ClassDesc desc) {
+        if (desc.isPrimitive() || desc.isArray()) {
+            return desc.descriptorString();
         }
+        var pkg = desc.packageName();
+        return pkg.isEmpty() ? desc.displayName() : pkg + "." + desc.displayName();
     }
 
-    private static URL toUrl(Path path) {
-        try {
-            return path.toUri().toURL();
-        } catch (MalformedURLException e) {
-            throw new IllegalArgumentException("Invalid path: " + path, e);
-        }
+    private static String internalNameToBinary(String internalName) {
+        return internalName.replace('/', '.');
     }
 
-    private static Set<String> collectClassNames(Path packageDir, String packageName) {
+    private static Set<String> collectClassNames(Path classRoot, Path packageDir) {
         var names = new HashSet<String>();
-        try (var stream = Files.list(packageDir)) {
+        try (var stream = Files.walk(packageDir)) {
             stream
                 .filter(p -> p.toString().endsWith(".class"))
-                .map(p -> p.getFileName().toString())
-                .filter(name -> !name.contains("$"))
-                .map(name -> packageName + "." + name.replace(".class", ""))
+                .filter(p -> !p.getFileName().toString().contains("$"))
+                .map(p -> toFqn(classRoot.relativize(p)))
                 .forEach(names::add);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         return names;
+    }
+
+    private static String toFqn(Path relativePath) {
+        var sb = new StringBuilder();
+        for (var element : relativePath) {
+            if (sb.length() > 0) sb.append('.');
+            sb.append(element.toString());
+        }
+        var s = sb.toString();
+        return s.endsWith(".class") ? s.substring(0, s.length() - 6) : s;
     }
 }

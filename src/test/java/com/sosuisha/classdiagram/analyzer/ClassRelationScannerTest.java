@@ -46,4 +46,15 @@ class ClassRelationScannerTest {
             r.sourceClass().equals(FIXTURE_PKG + ".FixtureItem")
         ));
     }
+
+    @Test
+    void scanDetectsCompositionWithCollectionField() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        assertTrue(relations.stream().anyMatch(r ->
+            r.sourceClass().equals(FIXTURE_PKG + ".FixtureOrder") &&
+            r.targetClass().equals(FIXTURE_PKG + ".FixtureItem") &&
+            r.type() == RelationType.COMPOSITION &&
+            r.isMany()
+        ));
+    }
 }

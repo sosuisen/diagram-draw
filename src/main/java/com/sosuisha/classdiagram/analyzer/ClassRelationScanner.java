@@ -2,11 +2,15 @@ package com.sosuisha.classdiagram.analyzer;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -42,7 +46,7 @@ public class ClassRelationScanner {
     private List<ClassRelation> analyzeRelations(Path classRoot, Set<String> targetClassNames) {
         var relations = new ArrayList<ClassRelation>();
 
-        try (var loader = new URLClassLoader(new java.net.URL[]{toUrl(classRoot)}, getClass().getClassLoader())) {
+        try (var loader = new URLClassLoader(new URL[]{toUrl(classRoot)}, getClass().getClassLoader())) {
             for (var className : targetClassNames) {
                 var clazz = loadClass(className, loader);
                 if (clazz == null) continue;
@@ -50,13 +54,13 @@ public class ClassRelationScanner {
                 var constructorParamTypeNames = collectConstructorParamTypeNames(clazz);
 
                 for (var field : clazz.getDeclaredFields()) {
-                    var fieldTypeName = field.getType().getName();
-                    if (!targetClassNames.contains(fieldTypeName)) continue;
+                    var resolved = resolveFieldTarget(field, targetClassNames);
+                    if (resolved == null) continue;
 
-                    var type = constructorParamTypeNames.contains(fieldTypeName)
+                    var type = constructorParamTypeNames.contains(resolved.targetClassName())
                         ? RelationType.AGGREGATION
                         : RelationType.COMPOSITION;
-                    relations.add(new ClassRelation(className, fieldTypeName, type, false));
+                    relations.add(new ClassRelation(className, resolved.targetClassName(), type, resolved.isMany()));
                 }
             }
         } catch (IOException e) {
@@ -64,6 +68,28 @@ public class ClassRelationScanner {
         }
 
         return List.copyOf(relations);
+    }
+
+    private record FieldTarget(String targetClassName, boolean isMany) {}
+
+    private static FieldTarget resolveFieldTarget(Field field, Set<String> targetClassNames) {
+        var fieldTypeName = field.getType().getName();
+        if (targetClassNames.contains(fieldTypeName)) {
+            return new FieldTarget(fieldTypeName, false);
+        }
+        if (Collection.class.isAssignableFrom(field.getType())) {
+            var genericType = field.getGenericType();
+            if (genericType instanceof ParameterizedType pt) {
+                var args = pt.getActualTypeArguments();
+                if (args.length == 1 && args[0] instanceof Class<?> argClass) {
+                    var argName = argClass.getName();
+                    if (targetClassNames.contains(argName)) {
+                        return new FieldTarget(argName, true);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static Set<String> collectConstructorParamTypeNames(Class<?> clazz) {
@@ -84,7 +110,7 @@ public class ClassRelationScanner {
         }
     }
 
-    private static java.net.URL toUrl(Path path) {
+    private static URL toUrl(Path path) {
         try {
             return path.toUri().toURL();
         } catch (MalformedURLException e) {

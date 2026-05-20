@@ -9,7 +9,7 @@ import java.util.Objects;
  * @param targetClassInfo フィールドの型クラス（所有される側）
  * @param type            COMPOSITION または AGGREGATION
  * @param isMany          コレクションフィールドの場合true
- * @throws NullPointerException sourceClassInfoまたはtargetClassInfoがnullの場合
+ * @throws NullPointerException sourceClassInfo、targetClassInfo、またはtypeがnullの場合
  */
 public record ClassRelation(
     ClassInfo sourceClassInfo,
@@ -20,5 +20,6 @@ public record ClassRelation(
     public ClassRelation {
         Objects.requireNonNull(sourceClassInfo, "sourceClassInfo must not be null");
         Objects.requireNonNull(targetClassInfo, "targetClassInfo must not be null");
+        Objects.requireNonNull(type, "type must not be null");
     }
 }

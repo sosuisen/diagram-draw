@@ -78,4 +78,13 @@ class ClassRelationTest {
             new ClassRelation(ClassInfo.fromFullyQualifiedName("com.example.A"), null,
                 RelationType.COMPOSITION, false));
     }
+
+    @Test
+    void constructorThrowsForNullType() {
+        assertThrows(NullPointerException.class, () ->
+            new ClassRelation(
+                ClassInfo.fromFullyQualifiedName("com.example.A"),
+                ClassInfo.fromFullyQualifiedName("com.example.B"),
+                null, false));
+    }
 }

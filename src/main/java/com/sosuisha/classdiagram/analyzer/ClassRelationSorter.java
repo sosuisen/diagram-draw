@@ -59,7 +59,7 @@ public class ClassRelationSorter {
         var currentLayer = inDegree.entrySet().stream()
             .filter(e -> e.getValue() == 0)
             .map(Map.Entry::getKey)
-            .sorted(Comparator.comparing(ClassInfo::simpleName))
+            .sorted(Comparator.comparing(ClassInfo::simpleName).thenComparing(ClassInfo::packageName))
             .collect(Collectors.toCollection(ArrayList::new));
 
         var result = new ArrayList<List<ClassInfo>>();
@@ -79,7 +79,7 @@ public class ClassRelationSorter {
                     }
                 }
             }
-            nextLayer.sort(Comparator.comparing(ClassInfo::simpleName));
+            nextLayer.sort(Comparator.comparing(ClassInfo::simpleName).thenComparing(ClassInfo::packageName));
             currentLayer = nextLayer;
         }
 

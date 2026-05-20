@@ -29,4 +29,16 @@ class ClassInfoTest {
         assertThrows(IllegalArgumentException.class,
             () -> ClassInfo.fromFullyQualifiedName(""));
     }
+
+    @Test
+    void fromFullyQualifiedNameThrowsForTrailingDot() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ClassInfo.fromFullyQualifiedName("com.example."));
+    }
+
+    @Test
+    void fromFullyQualifiedNameThrowsForLeadingDot() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ClassInfo.fromFullyQualifiedName(".Order"));
+    }
 }

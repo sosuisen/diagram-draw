@@ -11,9 +11,9 @@ import java.util.Objects;
 public record ClassInfo(String packageName, String simpleName) {
 
     /**
-     * Compact constructor that validates component nulls.
+     * コンポーネントnullチェックを行うコンパクトコンストラクタ。
      *
-     * @throws NullPointerException if packageName or simpleName is null
+     * @throws NullPointerException packageNameまたはsimpleNameがnullの場合
      */
     public ClassInfo {
         Objects.requireNonNull(packageName, "packageName must not be null");
@@ -31,7 +31,7 @@ public record ClassInfo(String packageName, String simpleName) {
     public static ClassInfo fromFullyQualifiedName(String fqn) {
         Objects.requireNonNull(fqn, "fqn must not be null");
         int dot = fqn.lastIndexOf('.');
-        if (dot < 0) {
+        if (dot <= 0 || dot == fqn.length() - 1) {
             throw new IllegalArgumentException(
                 "fqn must be a fully qualified name containing at least one '.': " + fqn);
         }

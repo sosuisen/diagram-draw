@@ -113,4 +113,18 @@ class DiagramDrawExampleTest {
 
         assertTrue(Files.exists(outputFile));
     }
+
+    @Test
+    void outputGeneratedClassDiagramSvgFile() throws IOException {
+        var svg = new ClassDiagramGenerator(30, 50, 30, 30)
+                .generate(Path.of("target/test-classes"),
+                          "com.sosuisha.classdiagram.analyzer.fixture");
+
+        var outputDir = Path.of("target/svg-output");
+        Files.createDirectories(outputDir);
+        var outputFile = outputDir.resolve("generated-class-diagram.svg");
+        Files.writeString(outputFile, svg);
+
+        assertTrue(Files.exists(outputFile));
+    }
 }

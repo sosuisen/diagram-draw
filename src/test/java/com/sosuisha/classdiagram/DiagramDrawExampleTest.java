@@ -1,5 +1,8 @@
 package com.sosuisha.classdiagram;
 
+import com.sosuisha.classdiagram.analyzer.ClassInfo;
+import com.sosuisha.classdiagram.analyzer.ClassRelation;
+import com.sosuisha.classdiagram.analyzer.ClassRelationSorter;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -109,6 +112,38 @@ class DiagramDrawExampleTest {
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);
         var outputFile = outputDir.resolve("classbox-example.svg");
+        Files.writeString(outputFile, svg);
+
+        assertTrue(Files.exists(outputFile));
+    }
+
+    @Test
+    void outputLongestPathReassignmentExampleSvgFile() throws IOException {
+        // Controller→Service→Repository, Controller→Logger
+        // Kahn:         [[Controller], [Service, Logger], [Repository]]
+        // Longest-path: [[Controller], [Service],         [Logger, Repository]]  ← Logger moves down
+        var pkg = "com.example";
+        var controller  = new ClassInfo(pkg, "Controller");
+        var service     = new ClassInfo(pkg, "Service");
+        var repository  = new ClassInfo(pkg, "Repository");
+        var logger      = new ClassInfo(pkg, "Logger");
+
+        var relations = List.of(
+            new ClassRelation(controller, service,    DependencyType.COMPOSITION, false),
+            new ClassRelation(service,    repository, DependencyType.COMPOSITION, false),
+            new ClassRelation(controller, logger,     DependencyType.AGGREGATION, false)
+        );
+
+        var layers = new ClassRelationSorter().sort(relations);
+        var result = new ClassDiagramLayout(30, 50, 30, 30).layout(layers, relations);
+        var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
+        result.boxes().forEach(builder::add);
+        result.dependencies().forEach(builder::add);
+        var svg = builder.build();
+
+        var outputDir = Path.of("target/svg-output");
+        Files.createDirectories(outputDir);
+        var outputFile = outputDir.resolve("longest-path-example.svg");
         Files.writeString(outputFile, svg);
 
         assertTrue(Files.exists(outputFile));

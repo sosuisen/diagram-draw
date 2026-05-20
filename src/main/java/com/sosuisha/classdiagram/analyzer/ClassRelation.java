@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.DependencyType;
 import java.util.Objects;
 
 /**
@@ -14,7 +15,7 @@ import java.util.Objects;
 public record ClassRelation(
     ClassInfo sourceClassInfo,
     ClassInfo targetClassInfo,
-    RelationType type,
+    DependencyType type,
     boolean isMany
 ) {
     public ClassRelation {

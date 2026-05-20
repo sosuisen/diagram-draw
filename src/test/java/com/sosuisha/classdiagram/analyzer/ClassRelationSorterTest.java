@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.DependencyType;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,7 +15,7 @@ class ClassRelationSorterTest {
     }
 
     private static ClassRelation rel(String src, String tgt) {
-        return new ClassRelation(ci(src), ci(tgt), RelationType.COMPOSITION, false);
+        return new ClassRelation(ci(src), ci(tgt), DependencyType.COMPOSITION, false);
     }
 
     @Test

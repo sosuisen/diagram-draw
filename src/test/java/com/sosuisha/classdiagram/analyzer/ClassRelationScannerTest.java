@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.DependencyType;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,7 +36,7 @@ class ClassRelationScannerTest {
             r.sourceClassInfo().simpleName().equals("FixtureOrder") &&
             r.targetClassInfo().packageName().equals(FIXTURE_PKG) &&
             r.targetClassInfo().simpleName().equals("FixtureCustomer") &&
-            r.type() == RelationType.AGGREGATION &&
+            r.type() == DependencyType.AGGREGATION &&
             !r.isMany()
         ));
     }
@@ -55,7 +56,7 @@ class ClassRelationScannerTest {
         assertTrue(relations.stream().anyMatch(r ->
             r.sourceClassInfo().simpleName().equals("FixtureOrder") &&
             r.targetClassInfo().simpleName().equals("FixtureItem") &&
-            r.type() == RelationType.COMPOSITION &&
+            r.type() == DependencyType.COMPOSITION &&
             r.isMany()
         ));
     }

@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.DependencyType;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,7 +14,7 @@ class ClassRelationTest {
         var r = new ClassRelation(
             ClassInfo.fromFullyQualifiedName("com.example.Order"),
             ClassInfo.fromFullyQualifiedName("com.example.Item"),
-            RelationType.COMPOSITION,
+            DependencyType.COMPOSITION,
             true
         );
         assertEquals("com.example", r.sourceClassInfo().packageName());
@@ -25,7 +26,7 @@ class ClassRelationTest {
         var r = new ClassRelation(
             ClassInfo.fromFullyQualifiedName("com.example.Order"),
             ClassInfo.fromFullyQualifiedName("com.example.Item"),
-            RelationType.COMPOSITION,
+            DependencyType.COMPOSITION,
             true
         );
         assertEquals("com.example", r.targetClassInfo().packageName());
@@ -37,10 +38,10 @@ class ClassRelationTest {
         var r = new ClassRelation(
             ClassInfo.fromFullyQualifiedName("com.example.Order"),
             ClassInfo.fromFullyQualifiedName("com.example.Item"),
-            RelationType.COMPOSITION,
+            DependencyType.COMPOSITION,
             true
         );
-        assertEquals(RelationType.COMPOSITION, r.type());
+        assertEquals(DependencyType.COMPOSITION, r.type());
     }
 
     @Test
@@ -48,7 +49,7 @@ class ClassRelationTest {
         var r = new ClassRelation(
             ClassInfo.fromFullyQualifiedName("com.example.Order"),
             ClassInfo.fromFullyQualifiedName("com.example.Item"),
-            RelationType.COMPOSITION,
+            DependencyType.COMPOSITION,
             true
         );
         assertTrue(r.isMany());
@@ -59,7 +60,7 @@ class ClassRelationTest {
         var r = new ClassRelation(
             ClassInfo.fromFullyQualifiedName("com.example.Order"),
             ClassInfo.fromFullyQualifiedName("com.example.Customer"),
-            RelationType.AGGREGATION,
+            DependencyType.AGGREGATION,
             false
         );
         assertFalse(r.isMany());
@@ -69,14 +70,14 @@ class ClassRelationTest {
     void constructorThrowsForNullSourceClassInfo() {
         assertThrows(NullPointerException.class, () ->
             new ClassRelation(null, ClassInfo.fromFullyQualifiedName("com.example.B"),
-                RelationType.COMPOSITION, false));
+                DependencyType.COMPOSITION, false));
     }
 
     @Test
     void constructorThrowsForNullTargetClassInfo() {
         assertThrows(NullPointerException.class, () ->
             new ClassRelation(ClassInfo.fromFullyQualifiedName("com.example.A"), null,
-                RelationType.COMPOSITION, false));
+                DependencyType.COMPOSITION, false));
     }
 
     @Test

@@ -9,6 +9,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import com.sosuisha.classdiagram.DependencyType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -66,8 +67,8 @@ public class ClassRelationScanner {
                     if (resolved == null) continue;
 
                     var type = constructorParamTypeNames.contains(resolved.targetClassName())
-                        ? RelationType.AGGREGATION
-                        : RelationType.COMPOSITION;
+                        ? DependencyType.AGGREGATION
+                        : DependencyType.COMPOSITION;
                     relations.add(new ClassRelation(
                         ClassInfo.fromFullyQualifiedName(className),
                         ClassInfo.fromFullyQualifiedName(resolved.targetClassName()),

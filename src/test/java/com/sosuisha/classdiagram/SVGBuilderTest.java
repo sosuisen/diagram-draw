@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -106,5 +107,30 @@ class SVGBuilderTest {
         var result = new SVGBuilder(800, 600).build();
         // height="600" appears on both <svg> and background <rect>
         assertEquals(2, result.split("height=\"600\"", -1).length - 1);
+    }
+
+    @Test
+    void fontFamilyReturnsSvgBuilder() {
+        var builder = new SVGBuilder(800, 600);
+        assertSame(builder, builder.fontFamily("HackGen"));
+    }
+
+    @Test
+    void fontFamilyThrowsForNull() {
+        assertThrows(NullPointerException.class,
+            () -> new SVGBuilder(800, 600).fontFamily(null));
+    }
+
+    @Test
+    void buildIncludesFontFamilyStyleWhenSet() {
+        var result = new SVGBuilder(800, 600).fontFamily("HackGen").build();
+        assertTrue(result.contains("font-family"));
+        assertTrue(result.contains("HackGen"));
+    }
+
+    @Test
+    void buildExcludesFontFamilyStyleByDefault() {
+        var result = new SVGBuilder(800, 600).build();
+        assertFalse(result.contains("font-family"));
     }
 }

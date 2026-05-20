@@ -12,6 +12,7 @@ public class SVGBuilder {
     private final int width;
     private final int height;
     private final List<SvgElement> elements = new ArrayList<>();
+    private String fontFamily = null;
 
     /**
      * SVGBuilderを生成する。
@@ -29,6 +30,19 @@ public class SVGBuilder {
         }
         this.width = width;
         this.height = height;
+    }
+
+    /**
+     * テキストに適用するフォントファミリーを設定する。
+     *
+     * @param fontFamily フォントファミリー名（例: "HackGen"）
+     * @return このビルダー自身（メソッドチェーン用）
+     * @throws NullPointerException fontFamilyがnullの場合
+     */
+    public SVGBuilder fontFamily(String fontFamily) {
+        Objects.requireNonNull(fontFamily, "fontFamily must not be null");
+        this.fontFamily = fontFamily;
+        return this;
     }
 
     /**
@@ -52,6 +66,9 @@ public class SVGBuilder {
     public String build() {
         var sb = new StringBuilder();
         sb.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\">".formatted(width, height));
+        if (fontFamily != null) {
+            sb.append("<style>text { font-family: '%s'; }</style>".formatted(fontFamily));
+        }
         sb.append("<rect data-diagram-draw=\"background\" width=\"%d\" height=\"%d\" fill=\"white\"/>".formatted(width, height));
         for (var element : elements) {
             sb.append(element.draw());

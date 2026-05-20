@@ -27,6 +27,21 @@ class ClassDiagramGeneratorTest {
     }
 
     @Test
+    void fontFamilyThrowsForNull() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassDiagramGenerator(20, 40, 20, 20).fontFamily(null));
+    }
+
+    @Test
+    void generateIncludesFontFamilyWhenSet() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20)
+            .fontFamily("HackGen")
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svg.contains("HackGen"));
+    }
+
+    @Test
     void generateProducesFullSvgForFixturePackage() {
         var svg = new ClassDiagramGenerator(20, 40, 20, 20)
             .generate(Path.of("target/test-classes"),

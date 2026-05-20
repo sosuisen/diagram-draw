@@ -17,6 +17,7 @@ public class ClassDiagramGenerator {
     private final int verticalGap;
     private final int canvasPaddingX;
     private final int canvasPaddingY;
+    private String fontFamily = null;
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -35,6 +36,19 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * テキストに適用するフォントファミリーを設定する。
+     *
+     * @param fontFamily フォントファミリー名（例: "HackGen"）
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException fontFamilyがnullの場合
+     */
+    public ClassDiagramGenerator fontFamily(String fontFamily) {
+        Objects.requireNonNull(fontFamily, "fontFamily must not be null");
+        this.fontFamily = fontFamily;
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -49,13 +63,16 @@ public class ClassDiagramGenerator {
 
         var relations = new ClassRelationScanner().scan(classRoot, packageName);
         if (relations.isEmpty()) {
-            return new SVGBuilder(canvasPaddingX * 2, canvasPaddingY * 2).build();
+            var builder = new SVGBuilder(canvasPaddingX * 2, canvasPaddingY * 2);
+            if (fontFamily != null) builder.fontFamily(fontFamily);
+            return builder.build();
         }
 
         var layers = new ClassRelationSorter().sort(relations);
         var result = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY)
                          .layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
+        if (fontFamily != null) builder.fontFamily(fontFamily);
         result.boxes().forEach(builder::add);
         result.dependencies().forEach(builder::add);
         return builder.build();

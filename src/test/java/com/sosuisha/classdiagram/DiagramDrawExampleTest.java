@@ -136,7 +136,7 @@ class DiagramDrawExampleTest {
 
         var layers = new ClassRelationSorter().sort(relations);
         var result = new ClassDiagramLayout(30, 50, 30, 30).layout(layers, relations);
-        var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
+        var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight()).fontFamily("HackGen");
         result.boxes().forEach(builder::add);
         result.dependencies().forEach(builder::add);
         var svg = builder.build();
@@ -152,6 +152,7 @@ class DiagramDrawExampleTest {
     @Test
     void outputGeneratedClassDiagramSvgFile() throws IOException {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30)
+                .fontFamily("HackGen")
                 .generate(Path.of("target/test-classes"),
                           "com.sosuisha.classdiagram.analyzer.fixture");
 

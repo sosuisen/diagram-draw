@@ -119,7 +119,7 @@ public class ClassRelationScanner {
     private static Class<?> loadClass(String className, ClassLoader loader) {
         try {
             return Class.forName(className, false, loader);
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
             return null;
         }
     }

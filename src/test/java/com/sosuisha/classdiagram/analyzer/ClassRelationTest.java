@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram.analyzer;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClassRelationTest {
@@ -62,5 +63,19 @@ class ClassRelationTest {
             false
         );
         assertFalse(r.isMany());
+    }
+
+    @Test
+    void constructorThrowsForNullSourceClassInfo() {
+        assertThrows(NullPointerException.class, () ->
+            new ClassRelation(null, ClassInfo.fromFullyQualifiedName("com.example.B"),
+                RelationType.COMPOSITION, false));
+    }
+
+    @Test
+    void constructorThrowsForNullTargetClassInfo() {
+        assertThrows(NullPointerException.class, () ->
+            new ClassRelation(ClassInfo.fromFullyQualifiedName("com.example.A"), null,
+                RelationType.COMPOSITION, false));
     }
 }

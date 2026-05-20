@@ -44,6 +44,7 @@ class ClassRelationScannerTest {
     void scanReturnsNoRelationsForPojoWithoutSamePackageFields() {
         var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
         assertTrue(relations.stream().noneMatch(r ->
+            r.sourceClassInfo().packageName().equals(FIXTURE_PKG) &&
             r.sourceClassInfo().simpleName().equals("FixtureItem")
         ));
     }

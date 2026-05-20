@@ -17,4 +17,16 @@ class ClassInfoTest {
         assertThrows(NullPointerException.class,
             () -> ClassInfo.fromFullyQualifiedName(null));
     }
+
+    @Test
+    void fromFullyQualifiedNameThrowsForUnqualifiedName() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ClassInfo.fromFullyQualifiedName("Order"));
+    }
+
+    @Test
+    void fromFullyQualifiedNameThrowsForEmptyString() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ClassInfo.fromFullyQualifiedName(""));
+    }
 }

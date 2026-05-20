@@ -68,7 +68,12 @@ public class ClassRelationScanner {
                     var type = constructorParamTypeNames.contains(resolved.targetClassName())
                         ? RelationType.AGGREGATION
                         : RelationType.COMPOSITION;
-                    relations.add(new ClassRelation(className, resolved.targetClassName(), type, resolved.isMany()));
+                    relations.add(new ClassRelation(
+                        ClassInfo.fromFullyQualifiedName(className),
+                        ClassInfo.fromFullyQualifiedName(resolved.targetClassName()),
+                        type,
+                        resolved.isMany()
+                    ));
                 }
             }
         } catch (IOException e) {

@@ -2,8 +2,7 @@ package com.sosuisha.classdiagram.analyzer;
 
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class ClassRelationScannerTest {
 
@@ -32,8 +31,10 @@ class ClassRelationScannerTest {
     void scanDetectsAggregationForConstructorInjectedField() {
         var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
         assertTrue(relations.stream().anyMatch(r ->
-            r.sourceClass().equals(FIXTURE_PKG + ".FixtureOrder") &&
-            r.targetClass().equals(FIXTURE_PKG + ".FixtureCustomer") &&
+            r.sourceClassInfo().packageName().equals(FIXTURE_PKG) &&
+            r.sourceClassInfo().simpleName().equals("FixtureOrder") &&
+            r.targetClassInfo().packageName().equals(FIXTURE_PKG) &&
+            r.targetClassInfo().simpleName().equals("FixtureCustomer") &&
             r.type() == RelationType.AGGREGATION &&
             !r.isMany()
         ));
@@ -43,7 +44,7 @@ class ClassRelationScannerTest {
     void scanReturnsNoRelationsForPojoWithoutSamePackageFields() {
         var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
         assertTrue(relations.stream().noneMatch(r ->
-            r.sourceClass().equals(FIXTURE_PKG + ".FixtureItem")
+            r.sourceClassInfo().simpleName().equals("FixtureItem")
         ));
     }
 
@@ -51,8 +52,8 @@ class ClassRelationScannerTest {
     void scanDetectsCompositionWithCollectionField() {
         var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
         assertTrue(relations.stream().anyMatch(r ->
-            r.sourceClass().equals(FIXTURE_PKG + ".FixtureOrder") &&
-            r.targetClass().equals(FIXTURE_PKG + ".FixtureItem") &&
+            r.sourceClassInfo().simpleName().equals("FixtureOrder") &&
+            r.targetClassInfo().simpleName().equals("FixtureItem") &&
             r.type() == RelationType.COMPOSITION &&
             r.isMany()
         ));

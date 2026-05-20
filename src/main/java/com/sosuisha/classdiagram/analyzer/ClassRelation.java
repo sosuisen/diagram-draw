@@ -1,16 +1,16 @@
 package com.sosuisha.classdiagram.analyzer;
 
 /**
- * Represents a single detected relationship between two classes.
+ * 2クラス間の関係を表す。
  *
- * @param sourceClass  fully qualified name of the class that owns the field
- * @param targetClass  fully qualified name of the referenced class
- * @param type         COMPOSITION or AGGREGATION classification
- * @param isMany       true if the field is a Collection<T>
+ * @param sourceClassInfo フィールドを持つクラス（所有側）
+ * @param targetClassInfo フィールドの型クラス（所有される側）
+ * @param type            COMPOSITION または AGGREGATION
+ * @param isMany          コレクションフィールドの場合true
  */
 public record ClassRelation(
-    String sourceClass,
-    String targetClass,
+    ClassInfo sourceClassInfo,
+    ClassInfo targetClassInfo,
     RelationType type,
     boolean isMany
 ) {}

@@ -54,7 +54,15 @@ class ClassRelationSorterTest {
         // A -> B -> A
         var ex = assertThrows(CircularRelationException.class,
             () -> sorter.sort(List.of(rel("A", "B"), rel("B", "A"))));
-        assertTrue(ex.getMessage().contains("A"));
-        assertTrue(ex.getMessage().contains("B"));
+        assertTrue(ex.getMessage().contains("[A, B]"));
+    }
+
+    @Test
+    void sortHandlesDuplicateEdgesWithoutFalseCycle() {
+        // Two relations with the same (A, B) pair must NOT trigger a false cycle
+        var result = sorter.sort(List.of(rel("A", "B"), rel("A", "B")));
+        assertEquals(2, result.size());
+        assertEquals(List.of(ci("A")), result.get(0));
+        assertEquals(List.of(ci("B")), result.get(1));
     }
 }

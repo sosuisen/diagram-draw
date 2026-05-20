@@ -41,9 +41,14 @@ public class ClassRelationSorter {
         Map<ClassInfo, Set<ClassInfo>> adjacency = new HashMap<>();
         Map<ClassInfo, Integer> inDegree = new HashMap<>();
 
-        for (var relation : relations) {
-            var src = relation.sourceClassInfo();
-            var tgt = relation.targetClassInfo();
+        // Deduplicate: same (source, target) pair may appear more than once in input
+        var uniqueEdges = relations.stream()
+            .map(r -> Map.entry(r.sourceClassInfo(), r.targetClassInfo()))
+            .collect(Collectors.toSet());
+
+        for (var edge : uniqueEdges) {
+            var src = edge.getKey();
+            var tgt = edge.getValue();
             inDegree.putIfAbsent(src, 0);
             inDegree.putIfAbsent(tgt, 0);
             adjacency.computeIfAbsent(src, k -> new HashSet<>()).add(tgt);

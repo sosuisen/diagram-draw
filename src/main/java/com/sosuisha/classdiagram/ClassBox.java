@@ -1,4 +1,4 @@
-package com.sosuisha;
+package com.sosuisha.classdiagram;
 
 import java.util.List;
 import java.util.Objects;

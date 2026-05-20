@@ -1,4 +1,4 @@
-package com.sosuisha;
+package com.sosuisha.classdiagram;
 
 /**
  * SVGの描画要素を表すインターフェース。

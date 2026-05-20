@@ -1,4 +1,4 @@
-package com.sosuisha;
+package com.sosuisha.classdiagram;
 
 import org.junit.jupiter.api.Test;
 import java.util.List;

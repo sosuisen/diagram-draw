@@ -78,6 +78,18 @@ public class ClassRelationScanner {
                     resolved.isMany()
                 ));
             }
+
+            for (var iface : model.interfaces()) {
+                var ifaceName = internalNameToBinary(iface.asInternalName());
+                if (targetClassNames.contains(ifaceName)) {
+                    relations.add(new ClassRelation(
+                        ClassInfo.fromFullyQualifiedName(className),
+                        ClassInfo.fromFullyQualifiedName(ifaceName),
+                        DependencyType.REALIZATION,
+                        false
+                    ));
+                }
+            }
         }
 
         return List.copyOf(relations);

@@ -74,4 +74,15 @@ class ClassRelationScannerTest {
             r.isMany()
         ));
     }
+
+    @Test
+    void scanDetectsRealizationForImplementsInterface() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        assertTrue(relations.stream().anyMatch(r ->
+            r.sourceClassInfo().simpleName().equals("FixtureServiceImpl") &&
+            r.targetClassInfo().simpleName().equals("FixtureService") &&
+            r.type() == DependencyType.REALIZATION &&
+            !r.isMany()
+        ));
+    }
 }

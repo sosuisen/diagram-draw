@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.DependencyType;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,8 +43,12 @@ public class ClassRelationSorter {
         Map<ClassInfo, Integer> inDegree = new HashMap<>();
 
         // Deduplicate: same (source, target) pair may appear more than once in input
+        // For REALIZATION edges, reverse direction so the interface (target) gets low in-degree
+        // and is placed in the top layer above the implementing class.
         var uniqueEdges = relations.stream()
-            .map(r -> Map.entry(r.sourceClassInfo(), r.targetClassInfo()))
+            .map(r -> r.type() == DependencyType.REALIZATION
+                ? Map.entry(r.targetClassInfo(), r.sourceClassInfo())
+                : Map.entry(r.sourceClassInfo(), r.targetClassInfo()))
             .collect(Collectors.toSet());
 
         for (var edge : uniqueEdges) {

@@ -66,4 +66,22 @@ class ClassRelationSorterTest {
         assertEquals(List.of(ci("A")), result.get(0));
         assertEquals(List.of(ci("B")), result.get(1));
     }
+
+    @Test
+    void sortPlacesInterfaceAboveImplementationForRealization() {
+        var impl = ci("FooImpl");
+        var iface = ci("IFoo");
+        var rel = new ClassRelation(impl, iface, DependencyType.REALIZATION, false);
+        var layers = sorter.sort(List.of(rel));
+
+        int ifaceLayerIdx = -1, implLayerIdx = -1;
+        for (int i = 0; i < layers.size(); i++) {
+            if (layers.get(i).contains(iface)) ifaceLayerIdx = i;
+            if (layers.get(i).contains(impl)) implLayerIdx = i;
+        }
+        assertTrue(ifaceLayerIdx >= 0 && implLayerIdx >= 0,
+            "Both interface and impl must appear in layers");
+        assertTrue(ifaceLayerIdx < implLayerIdx,
+            "Interface layer (%d) must have lower index than impl layer (%d)".formatted(ifaceLayerIdx, implLayerIdx));
+    }
 }

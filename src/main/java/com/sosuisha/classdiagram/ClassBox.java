@@ -8,7 +8,7 @@ import java.util.Random;
  * UMLクラスボックスを表すオブジェクト。
  *
  * <p>名前・フィールド・メソッドの3コンパートメントを持つ。
- * 内容（名前・フィールド・メソッド）は構築後イミュータブル。
+ * 内容（ステレオタイプ・名前・フィールド・メソッド）は構築後イミュータブル。
  * 描画位置は {@link #setPosition(int, int)} で設定する。
  * 幅・高さはコンテンツから自動計算される。
  * 輪郭線・区切り線はコンテンツのハッシュを種としたゆらぎを持つ。
@@ -22,11 +22,11 @@ public final class ClassBox implements SvgElement {
     private static final int PADDING_Y  = 4;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int MIN_WIDTH  = 100;
-    // ゆらぎ上限: コンテンツの充実度に応じて段階的に大きくする
     private static final double SKETCH_MAX_NONE = 1.0;
     private static final double SKETCH_MAX_SOME = 1.5;
     private static final double SKETCH_MAX_FULL = 2.0;
 
+    private final ClassStereotype stereotype;
     private final String name;
     private final List<String> fields;
     private final List<String> methods;
@@ -34,17 +34,28 @@ public final class ClassBox implements SvgElement {
     private int y = 0;
 
     /**
-     * フィールドとメソッドを指定せずにClassBoxを生成する。
+     * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
      *
      * @param name クラス名
      * @throws NullPointerException nameがnullの場合
      */
     public ClassBox(String name) {
-        this(name, List.of(), List.of());
+        this(name, ClassStereotype.NONE, List.of(), List.of());
     }
 
     /**
-     * ClassBoxを生成する。
+     * ステレオタイプを指定してClassBoxを生成する（フィールド・メソッドなし）。
+     *
+     * @param name       クラス名
+     * @param stereotype ステレオタイプ
+     * @throws NullPointerException nameまたはstereotypeがnullの場合
+     */
+    public ClassBox(String name, ClassStereotype stereotype) {
+        this(name, stereotype, List.of(), List.of());
+    }
+
+    /**
+     * フィールドとメソッドを指定してClassBoxを生成する（stereotype = NONE）。
      *
      * @param name クラス名
      * @param fields フィールド一覧
@@ -52,13 +63,31 @@ public final class ClassBox implements SvgElement {
      * @throws NullPointerException name、fields、またはmethodsがnullの場合
      */
     public ClassBox(String name, List<String> fields, List<String> methods) {
+        this(name, ClassStereotype.NONE, fields, methods);
+    }
+
+    /**
+     * ClassBoxを生成する。
+     *
+     * @param name       クラス名
+     * @param stereotype ステレオタイプ
+     * @param fields     フィールド一覧
+     * @param methods    メソッド一覧
+     * @throws NullPointerException name、stereotype、fields、またはmethodsがnullの場合
+     */
+    public ClassBox(String name, ClassStereotype stereotype, List<String> fields, List<String> methods) {
         Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(stereotype, "stereotype must not be null");
         Objects.requireNonNull(fields, "fields must not be null");
         Objects.requireNonNull(methods, "methods must not be null");
         this.name = name;
+        this.stereotype = stereotype;
         this.fields = List.copyOf(fields);
         this.methods = List.copyOf(methods);
     }
+
+    /** @return ステレオタイプ */
+    public ClassStereotype stereotype() { return stereotype; }
 
     /** @return クラス名 */
     public String name() { return name; }
@@ -93,6 +122,9 @@ public final class ClassBox implements SvgElement {
      */
     public int width() {
         int maxLen = name.length();
+        if (stereotype != ClassStereotype.NONE) {
+            maxLen = Math.max(maxLen, stereotype.label().length());
+        }
         for (var f : fields) {
             maxLen = Math.max(maxLen, f.length());
         }
@@ -108,7 +140,8 @@ public final class ClassBox implements SvgElement {
      * @return 高さ（px）
      */
     public int height() {
-        return compartmentHeight(1)
+        int nameLines = stereotype == ClassStereotype.NONE ? 1 : 2;
+        return compartmentHeight(nameLines)
              + compartmentHeight(fields.size())
              + compartmentHeight(methods.size());
     }
@@ -189,9 +222,19 @@ public final class ClassBox implements SvgElement {
     }
 
     private int appendNameCompartment(StringBuilder sb, int width, int startY) {
-        int textY = startY + PADDING_Y + ASCENT;
-        sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(width / 2, textY, FONT_SIZE, name));
-        return compartmentHeight(1);
+        if (stereotype == ClassStereotype.NONE) {
+            int textY = startY + PADDING_Y + ASCENT;
+            sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+                width / 2, textY, FONT_SIZE, name));
+            return compartmentHeight(1);
+        }
+        int stereoY = startY + PADDING_Y + ASCENT;
+        int nameY = startY + PADDING_Y + ASCENT + FONT_SIZE + LINE_GAP;
+        sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+            width / 2, stereoY, FONT_SIZE - 2, stereotype.label()));
+        sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+            width / 2, nameY, FONT_SIZE, name));
+        return compartmentHeight(2);
     }
 
     private int appendTextCompartment(StringBuilder sb, List<String> lines, int width, int startY) {

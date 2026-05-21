@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
+import com.sosuisha.classdiagram.ClassStereotype;
 
 class ClassBoxTest {
 
@@ -167,5 +168,42 @@ class ClassBoxTest {
         var result1 = new ClassBox("MyClass").draw();
         var result2 = new ClassBox("MyClass").draw();
         assertEquals(result1, result2);
+    }
+
+    @Test
+    void defaultBoxHasNoneStereotype() {
+        assertEquals(ClassStereotype.NONE, new ClassBox("MyClass").stereotype());
+    }
+
+    @Test
+    void interfaceBoxHasInterfaceStereotype() {
+        var box = new ClassBox("IFoo", ClassStereotype.INTERFACE);
+        assertEquals(ClassStereotype.INTERFACE, box.stereotype());
+    }
+
+    @Test
+    void interfaceBoxDrawContainsStereotypeLabel() {
+        var result = new ClassBox("IFoo", ClassStereotype.INTERFACE).draw();
+        assertTrue(result.contains("«interface»"));
+    }
+
+    @Test
+    void noneBoxDrawDoesNotContainStereotypeLabel() {
+        assertFalse(new ClassBox("MyClass").draw().contains("«interface»"));
+    }
+
+    @Test
+    void interfaceBoxNameCompartmentIsTwoLinesTaller() {
+        // NONE: compartmentHeight(1) = 22; INTERFACE: compartmentHeight(2) = 40; diff = 18
+        int noneHeight = new ClassBox("MyClass").height();
+        int ifaceHeight = new ClassBox("MyClass", ClassStereotype.INTERFACE).height();
+        assertEquals(noneHeight + 18, ifaceHeight);
+    }
+
+    @Test
+    void interfaceBoxWidthAccountsForStereotypeLabel() {
+        // «interface» = 11 chars: 11 * CHAR_WIDTH(8) + PADDING_X*2(16) = 104 > MIN_WIDTH(100)
+        // "X" alone: 1 * 8 + 16 = 24 → clamped to MIN_WIDTH 100
+        assertEquals(104, new ClassBox("X", ClassStereotype.INTERFACE).width());
     }
 }

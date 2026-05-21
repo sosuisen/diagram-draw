@@ -1,6 +1,8 @@
 package com.sosuisha.classdiagram.analyzer;
 
+import com.sosuisha.classdiagram.ClassStereotype;
 import com.sosuisha.classdiagram.DependencyType;
+import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
@@ -99,5 +101,29 @@ class ClassRelationScannerTest {
             r.targetClassInfo().simpleName().equals("FixtureAnotherService") &&
             r.type() == DependencyType.REALIZATION
         ));
+    }
+
+    @Test
+    void scanAssignsInterfaceStereotypeToInterfaceTarget() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        var ifaceInfo = relations.stream()
+            .filter(r -> r.type() == DependencyType.REALIZATION
+                      && r.targetClassInfo().simpleName().equals("FixtureService"))
+            .map(ClassRelation::targetClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertEquals(ClassStereotype.INTERFACE, ifaceInfo.stereotype());
+    }
+
+    @Test
+    void scanAssignsNoneStereotypeToConcreteClassSource() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXTURE_PKG);
+        var implInfo = relations.stream()
+            .filter(r -> r.type() == DependencyType.REALIZATION
+                      && r.sourceClassInfo().simpleName().equals("FixtureServiceImpl"))
+            .map(ClassRelation::sourceClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertEquals(ClassStereotype.NONE, implInfo.stereotype());
     }
 }

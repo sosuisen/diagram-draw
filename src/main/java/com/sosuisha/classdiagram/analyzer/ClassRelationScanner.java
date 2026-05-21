@@ -8,12 +8,16 @@ import java.lang.classfile.ClassModel;
 import java.lang.classfile.FieldModel;
 import java.lang.classfile.Signature;
 import java.lang.constant.ClassDesc;
+import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import com.sosuisha.classdiagram.ClassStereotype;
 import com.sosuisha.classdiagram.DependencyType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -21,6 +25,7 @@ import java.util.Set;
  * コンパイル済みクラスファイルをリフレクションで分析し、コンポジション・集約・実現関係を返すスキャナー。
  *
  * <p>指定パッケージおよびサブパッケージの {@code .class} ファイルを対象とする。
+ * 2パス方式: 第1パスでステレオタイプを収集し、第2パスで関係を構築する。
  * {@link #scan(Path, String)} が {@link ClassRelation} のリストを返す。
  */
 public class ClassRelationScanner {
@@ -51,6 +56,7 @@ public class ClassRelationScanner {
     }
 
     private List<ClassRelation> analyzeRelations(Path classRoot, Set<String> targetClassNames) {
+        var stereotypes = collectStereotypes(classRoot, targetClassNames);
         var relations = new ArrayList<ClassRelation>();
 
         for (var className : targetClassNames) {
@@ -62,29 +68,30 @@ public class ClassRelationScanner {
                 continue;
             }
 
+            var sourceInfo = ClassInfo.fromFullyQualifiedName(className,
+                stereotypes.getOrDefault(className, ClassStereotype.NONE));
             var constructorParamTypeNames = collectConstructorParamTypeNames(model);
 
             for (var field : model.fields()) {
                 var resolved = resolveFieldTarget(field, targetClassNames);
                 if (resolved == null) continue;
 
+                var targetInfo = ClassInfo.fromFullyQualifiedName(resolved.targetClassName(),
+                    stereotypes.getOrDefault(resolved.targetClassName(), ClassStereotype.NONE));
                 var type = constructorParamTypeNames.contains(resolved.targetClassName())
                     ? DependencyType.AGGREGATION
                     : DependencyType.COMPOSITION;
-                relations.add(new ClassRelation(
-                    ClassInfo.fromFullyQualifiedName(className),
-                    ClassInfo.fromFullyQualifiedName(resolved.targetClassName()),
-                    type,
-                    resolved.isMany()
-                ));
+                relations.add(new ClassRelation(sourceInfo, targetInfo, type, resolved.isMany()));
             }
 
             for (var iface : model.interfaces()) {
                 var ifaceName = internalNameToBinary(iface.asInternalName());
                 if (targetClassNames.contains(ifaceName)) {
+                    var ifaceInfo = ClassInfo.fromFullyQualifiedName(ifaceName,
+                        stereotypes.getOrDefault(ifaceName, ClassStereotype.NONE));
                     relations.add(new ClassRelation(
-                        ClassInfo.fromFullyQualifiedName(className),
-                        ClassInfo.fromFullyQualifiedName(ifaceName),
+                        sourceInfo,
+                        ifaceInfo,
                         DependencyType.REALIZATION,
                         false
                     ));
@@ -93,6 +100,22 @@ public class ClassRelationScanner {
         }
 
         return List.copyOf(relations);
+    }
+
+    private Map<String, ClassStereotype> collectStereotypes(Path classRoot, Set<String> targetClassNames) {
+        var map = new HashMap<String, ClassStereotype>();
+        for (var className : targetClassNames) {
+            var classFilePath = classRoot.resolve(className.replace('.', '/') + ".class");
+            try {
+                var model = ClassFile.of().parse(classFilePath);
+                map.put(className, model.flags().has(AccessFlag.INTERFACE)
+                    ? ClassStereotype.INTERFACE
+                    : ClassStereotype.NONE);
+            } catch (IOException e) {
+                map.put(className, ClassStereotype.NONE);
+            }
+        }
+        return map;
     }
 
     private record FieldTarget(String targetClassName, boolean isMany) {}

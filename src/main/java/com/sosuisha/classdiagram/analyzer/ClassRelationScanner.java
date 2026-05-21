@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * コンパイル済みクラスファイルをリフレクションで分析し、コンポジション・集約関係を返すスキャナー。
+ * コンパイル済みクラスファイルをリフレクションで分析し、コンポジション・集約・実現関係を返すスキャナー。
  *
  * <p>指定パッケージおよびサブパッケージの {@code .class} ファイルを対象とする。
  * {@link #scan(Path, String)} が {@link ClassRelation} のリストを返す。
@@ -26,7 +26,7 @@ import java.util.Set;
 public class ClassRelationScanner {
 
     /**
-     * 指定パッケージおよびサブパッケージ内のクラスを分析し、コンポジション・集約関係を返す。
+     * 指定パッケージおよびサブパッケージ内のクラスを分析し、コンポジション・集約・実現関係を返す。
      *
      * @param classRoot コンパイル済みクラスのルートディレクトリ
      * @param packageName 分析対象パッケージ名

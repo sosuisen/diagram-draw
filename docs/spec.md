@@ -15,6 +15,7 @@
 ```
 com.sosuisha.classdiagram
 ├── SvgElement.java              インターフェース: SVG描画要素
+├── ClassStereotype.java         ステレオタイプ列挙型（NONE, INTERFACE）
 ├── ClassBox.java                クラスボックス（SVG要素）
 ├── Dependency.java              関係線（SVG要素）
 ├── DependencyType.java          関係の種類（列挙型）
@@ -44,6 +45,19 @@ public interface SvgElement {
 
 ---
 
+### `ClassStereotype` 列挙型
+
+クラスのステレオタイプ。
+
+| 値 | 意味 | SVG表現 |
+|----|------|---------|
+| `NONE` | 通常クラス（ステレオタイプなし） | クラス名のみ表示 |
+| `INTERFACE` | インタフェース | `«interface»`（font-size 12）をクラス名の上に表示 |
+
+将来の拡張: `ABSTRACT`（抽象クラス）、`ENUM`（列挙型）など。
+
+---
+
 ### `DependencyType` 列挙型
 
 クラス間の依存関係の種類。
@@ -69,8 +83,11 @@ UMLクラスボックスを表す。`SvgElement` を実装。
 
 ```java
 new ClassBox("MyClass")
+new ClassBox("MyClass", ClassStereotype.INTERFACE)
 new ClassBox("MyClass", List.of("id: Long"), List.of("getId(): Long"))
+new ClassBox("MyClass", ClassStereotype.INTERFACE, List.of(), List.of())
 
+ClassStereotype s = box.stereotype();
 int w = box.width();
 int h = box.height();
 box.setPosition(50, 60);
@@ -172,11 +189,18 @@ public String build()                             // SVG文字列を返す
 クラスのパッケージ名と単純名を保持する識別子。
 
 ```java
-public record ClassInfo(String packageName, String simpleName)
+public record ClassInfo(String packageName, String simpleName, ClassStereotype stereotype)
 
-// 完全修飾名から生成
+// 完全修飾名から生成（stereotype = NONE）
 ClassInfo.fromFullyQualifiedName("com.example.Order")
-// → ClassInfo("com.example", "Order")
+// → ClassInfo("com.example", "Order", ClassStereotype.NONE)
+
+// 完全修飾名とステレオタイプから生成
+ClassInfo.fromFullyQualifiedName("com.example.IService", ClassStereotype.INTERFACE)
+// → ClassInfo("com.example", "IService", ClassStereotype.INTERFACE)
+
+// 後方互換2引数コンストラクタ（stereotype = NONE）
+new ClassInfo("com.example", "Order")
 ```
 
 ---

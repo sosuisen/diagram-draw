@@ -95,14 +95,14 @@ compartmentHeight(nameLineCount) + compartmentHeight(fields.size()) + compartmen
 The stereotype label string (`«interface»` etc.) also participates in max-length calculation.
 
 **`draw()` change — `appendNameCompartment`**  
-When `stereotype != NONE`, render stereotype text on the first line in italic, then class name on the second line, both centered:
+When `stereotype != NONE`, render stereotype text on the first line in normal style, then class name on the second line, both centered:
 
 ```xml
-<text x="{cx}" y="{stereotypeY}" font-size="12" font-style="italic" text-anchor="middle">«interface»</text>
+<text x="{cx}" y="{stereotypeY}" font-size="12" text-anchor="middle">«interface»</text>
 <text x="{cx}" y="{nameY}"       font-size="14" text-anchor="middle">{name}</text>
 ```
 
-Stereotype font size: 12 (slightly smaller than name). Font style: italic.
+Stereotype font size: 12 (slightly smaller than name). Font style: normal (not italic; italic is reserved for abstract class names in UML).
 
 Stereotype label strings:
 | `ClassStereotype` | Label text |
@@ -126,8 +126,8 @@ No other changes.
 ## SVG output (name compartment, stereotype = INTERFACE)
 
 ```xml
-<!-- stereotype line (italic, font-size 12) -->
-<text x="{cx}" y="{stereotypeY}" font-size="12" font-style="italic" text-anchor="middle">«interface»</text>
+<!-- stereotype line (normal style, font-size 12) -->
+<text x="{cx}" y="{stereotypeY}" font-size="12" text-anchor="middle">«interface»</text>
 <!-- name line (font-size 14) -->
 <text x="{cx}" y="{nameY}"       font-size="14" text-anchor="middle">{name}</text>
 ```

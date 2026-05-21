@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * クラス関係情報からレイアウト位置を計算するエンジン。
@@ -59,6 +60,9 @@ public class ClassDiagramLayout {
 
         // Step 1: 最長パス法でレイヤーを再割り当て
         var reassigned = reassignLayers(layers, relations);
+
+        // Step 1.5: 同一インタフェースを実装するクラスを同一レイヤーに揃える
+        reassigned = equalizeImplementationLayers(reassigned, relations);
 
         // Step 2: ClassInfo → ClassBox マップ作成（挿入順保持）
         Map<ClassInfo, ClassBox> boxMap = new LinkedHashMap<>();
@@ -186,6 +190,63 @@ public class ClassDiagramLayout {
                                  .thenComparing(ClassInfo::packageName));
         }
 
+        return result;
+    }
+
+    /**
+     * 同一インタフェースを実装するクラスを同一レイヤーに揃える後処理。
+     *
+     * <p>2つ以上のインタフェースを実装するクラスは対象外。
+     * 対象グループが2クラス未満の場合も変更なし。
+     * 移動後に空になったレイヤーは除去する。
+     */
+    private List<List<ClassInfo>> equalizeImplementationLayers(
+            List<List<ClassInfo>> layers,
+            List<ClassRelation> relations) {
+
+        Map<ClassInfo, Integer> layerOf = new HashMap<>();
+        for (int i = 0; i < layers.size(); i++) {
+            for (var info : layers.get(i)) {
+                layerOf.put(info, i);
+            }
+        }
+
+        Map<ClassInfo, Long> ifaceCount = relations.stream()
+            .filter(r -> r.type() == DependencyType.REALIZATION)
+            .collect(Collectors.groupingBy(ClassRelation::sourceClassInfo, Collectors.counting()));
+
+        Map<ClassInfo, List<ClassInfo>> ifaceToImpls = new HashMap<>();
+        for (var rel : relations) {
+            if (rel.type() != DependencyType.REALIZATION) continue;
+            if (ifaceCount.getOrDefault(rel.sourceClassInfo(), 0L) != 1L) continue;
+            ifaceToImpls.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
+                        .add(rel.sourceClassInfo());
+        }
+
+        for (var impls : ifaceToImpls.values()) {
+            if (impls.size() < 2) continue;
+            int minLayer = impls.stream()
+                .mapToInt(impl -> layerOf.getOrDefault(impl, 0))
+                .min()
+                .orElse(0);
+            for (var impl : impls) {
+                layerOf.put(impl, minLayer);
+            }
+        }
+
+        int numLayers = layers.size();
+        List<List<ClassInfo>> result = new ArrayList<>();
+        for (int i = 0; i < numLayers; i++) {
+            result.add(new ArrayList<>());
+        }
+        for (var entry : layerOf.entrySet()) {
+            result.get(entry.getValue()).add(entry.getKey());
+        }
+        for (var layer : result) {
+            layer.sort(Comparator.comparing(ClassInfo::simpleName)
+                                 .thenComparing(ClassInfo::packageName));
+        }
+        result.removeIf(List::isEmpty);
         return result;
     }
 }

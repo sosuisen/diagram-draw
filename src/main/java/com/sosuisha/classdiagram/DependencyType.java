@@ -7,5 +7,7 @@ public enum DependencyType {
     /** コンポジション（強い所有関係）*/
     COMPOSITION,
     /** 集約（弱い所有関係）*/
-    AGGREGATION
+    AGGREGATION,
+    /** 実現（インタフェースと実装クラスの関係）*/
+    REALIZATION
 }

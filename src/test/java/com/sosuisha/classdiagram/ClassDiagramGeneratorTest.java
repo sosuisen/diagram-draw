@@ -51,4 +51,13 @@ class ClassDiagramGeneratorTest {
         assertTrue(svg.contains("FixtureItem"));
         assertTrue(svg.contains("FixtureCustomer"));
     }
+
+    @Test
+    void generateIncludesStereotypeLabelForInterfaces() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svg.contains("«interface»"),
+            "SVG must contain «interface» stereotype label for FixtureService");
+    }
 }

@@ -57,7 +57,7 @@ public class ClassDiagramLayout {
         Map<ClassInfo, ClassBox> boxMap = new LinkedHashMap<>();
         for (var layer : layers) {
             for (var info : layer) {
-                boxMap.put(info, new ClassBox(info.simpleName()));
+                boxMap.put(info, new ClassBox(info.simpleName(), info.stereotype()));
             }
         }
 

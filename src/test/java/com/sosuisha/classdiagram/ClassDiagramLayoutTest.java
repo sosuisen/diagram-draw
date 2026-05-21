@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import com.sosuisha.classdiagram.analyzer.ClassRelationSorter;
+import com.sosuisha.classdiagram.ClassStereotype;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -142,5 +143,21 @@ class ClassDiagramLayoutTest {
         var boxImplB = result.boxes().stream().filter(b -> b.name().equals("FooImplB")).findFirst().orElseThrow();
         assertEquals(boxImplA.y(), boxImplB.y(),
             "Co-implementations of the same interface must be at the same layer");
+    }
+
+    @Test
+    void layoutPassesStereotypeToClassBox() {
+        var iface = new ClassInfo(PKG, "IFoo", ClassStereotype.INTERFACE);
+        var impl = new ClassInfo(PKG, "FooImpl"); // NONE
+        var rel = new ClassRelation(impl, iface, DependencyType.REALIZATION, false);
+        var layers = new ClassRelationSorter().sort(List.of(rel));
+        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, List.of(rel));
+
+        var ifaceBox = result.boxes().stream()
+            .filter(b -> b.name().equals("IFoo")).findFirst().orElseThrow();
+        var implBox = result.boxes().stream()
+            .filter(b -> b.name().equals("FooImpl")).findFirst().orElseThrow();
+        assertEquals(ClassStereotype.INTERFACE, ifaceBox.stereotype());
+        assertEquals(ClassStereotype.NONE, implBox.stereotype());
     }
 }

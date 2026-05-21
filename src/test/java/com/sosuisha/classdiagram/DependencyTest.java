@@ -86,4 +86,29 @@ class DependencyTest {
         var result = dep(DependencyType.COMPOSITION).draw();
         assertFalse(result.contains("x2=\"250.0\""));
     }
+
+    private static Dependency realizationDep() {
+        var source = new ClassBox("FooImpl");
+        source.setPosition(50, 200);
+        var target = new ClassBox("IFoo");
+        target.setPosition(50, 0);
+        return new Dependency(source, target, DependencyType.REALIZATION);
+    }
+
+    @Test
+    void drawRealizationHasDataAttribute() {
+        assertTrue(realizationDep().draw().contains("data-diagram-draw-type=\"realization\""));
+    }
+
+    @Test
+    void drawRealizationHasDashedLine() {
+        assertTrue(realizationDep().draw().contains("stroke-dasharray"));
+    }
+
+    @Test
+    void drawRealizationHasHollowTriangle() {
+        var svg = realizationDep().draw();
+        assertTrue(svg.contains("<polygon"));
+        assertTrue(svg.contains("fill=\"white\""));
+    }
 }

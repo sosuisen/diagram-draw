@@ -12,6 +12,8 @@ public final class Dependency implements SvgElement {
 
     private static final int DIAMOND_HALF_LEN = 10;
     private static final int DIAMOND_HALF_WIDTH = 5;
+    private static final int TRIANGLE_LEN = 20;
+    private static final int TRIANGLE_HALF_WIDTH = 8;
 
     private final ClassBox source;
     private final ClassBox target;
@@ -74,6 +76,10 @@ public final class Dependency implements SvgElement {
 
         double[] sp = edgeIntersection(source, nx, ny);
         double[] tp = edgeIntersection(target, -nx, -ny);
+
+        if (type == DependencyType.REALIZATION) {
+            return drawRealization(sp, tp, nx, ny);
+        }
 
         // ダイアモンドの後端をソース辺上に合わせ、全体をボックス外に配置する
         double diamondCx = sp[0] + nx * DIAMOND_HALF_LEN;
@@ -166,5 +172,25 @@ public final class Dependency implements SvgElement {
         String fill = type == DependencyType.COMPOSITION ? "black" : "none";
         return "<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"%s\" stroke=\"black\"/>".formatted(
             pts[0], pts[1], pts[2], pts[3], pts[4], pts[5], pts[6], pts[7], fill);
+    }
+
+    private String drawRealization(double[] sp, double[] tp, double nx, double ny) {
+        double px = -ny;
+        double py = nx;
+        double baseCx = tp[0] - nx * TRIANGLE_LEN;
+        double baseCy = tp[1] - ny * TRIANGLE_LEN;
+        double bx1 = baseCx + px * TRIANGLE_HALF_WIDTH;
+        double by1 = baseCy + py * TRIANGLE_HALF_WIDTH;
+        double bx2 = baseCx - px * TRIANGLE_HALF_WIDTH;
+        double by2 = baseCy - py * TRIANGLE_HALF_WIDTH;
+
+        var sb = new StringBuilder();
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"realization\">");
+        sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
+            sp[0], sp[1], baseCx, baseCy));
+        sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"black\"/>".formatted(
+            tp[0], tp[1], bx1, by1, bx2, by2));
+        sb.append("</g>");
+        return sb.toString();
     }
 }

@@ -3,20 +3,15 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * クラス関係情報からレイアウト位置を計算するエンジン。
  *
- * <p>Kahn法のレイヤー結果を最長パス法で再割り当てし、末端クラスを最下層へ集める。
+ * <p>ClassRelationSorterのKahn法レイヤーをそのまま使用し、
  * 各レイヤー内のボックスはキャンバス中央揃えで配置される。
  */
 public class ClassDiagramLayout {
@@ -58,27 +53,21 @@ public class ClassDiagramLayout {
             return new LayoutResult(List.of(), List.of(), canvasPaddingX * 2, canvasPaddingY * 2);
         }
 
-        // Step 1: 最長パス法でレイヤーを再割り当て
-        var reassigned = reassignLayers(layers, relations);
-
-        // Step 2: 同一インタフェースを実装するクラスを同一レイヤーに揃える
-        reassigned = equalizeImplementationLayers(reassigned, relations);
-
-        // Step 3: ClassInfo → ClassBox マップ作成（挿入順保持）
+        // Step 1: ClassInfo → ClassBox マップ作成（挿入順保持）
         Map<ClassInfo, ClassBox> boxMap = new LinkedHashMap<>();
-        for (var layer : reassigned) {
+        for (var layer : layers) {
             for (var info : layer) {
                 boxMap.put(info, new ClassBox(info.simpleName()));
             }
         }
 
-        // Step 4: レイヤーごとに幅と最大高さを計算
-        int numLayers = reassigned.size();
+        // Step 2: レイヤーごとに幅と最大高さを計算
+        int numLayers = layers.size();
         int[] maxBoxHeight = new int[numLayers];
         int[] layerWidth = new int[numLayers];
 
         for (int i = 0; i < numLayers; i++) {
-            var layer = reassigned.get(i);
+            var layer = layers.get(i);
             int w = 0;
             int maxH = 0;
             for (var info : layer) {
@@ -99,10 +88,10 @@ public class ClassDiagramLayout {
             canvasContentWidth = Math.max(canvasContentWidth, w);
         }
 
-        // Step 5: 中央揃えで各ボックスに座標を設定
+        // Step 3: 中央揃えで各ボックスに座標を設定
         int currentY = canvasPaddingY;
         for (int i = 0; i < numLayers; i++) {
-            var layer = reassigned.get(i);
+            var layer = layers.get(i);
             int startX = canvasPaddingX + (canvasContentWidth - layerWidth[i]) / 2;
             int x = startX;
             for (var info : layer) {
@@ -113,14 +102,14 @@ public class ClassDiagramLayout {
             currentY += maxBoxHeight[i] + verticalGap;
         }
 
-        // Step 6: キャンバスサイズ計算
+        // Step 4: キャンバスサイズ計算
         int totalHeight = 0;
         for (int h : maxBoxHeight) totalHeight += h;
         totalHeight += (numLayers - 1) * verticalGap;
         int canvasWidth = canvasContentWidth + 2 * canvasPaddingX;
         int canvasHeight = totalHeight + 2 * canvasPaddingY;
 
-        // Step 7: Dependency 生成
+        // Step 5: Dependency 生成
         var dependencies = new ArrayList<Dependency>();
         for (var rel : relations) {
             var src = boxMap.get(rel.sourceClassInfo());
@@ -136,117 +125,5 @@ public class ClassDiagramLayout {
             canvasWidth,
             canvasHeight
         );
-    }
-
-    /**
-     * Kahn法のレイヤーを最長パス法で再割り当てする。
-     *
-     * <p>depth[v] = vから最も遠い末端までの最長パス長。末端ノードは depth=0。
-     * layer[v] = maxDepth - depth[v] により末端が最下層に集まる。
-     */
-    private List<List<ClassInfo>> reassignLayers(
-            List<List<ClassInfo>> kahnsLayers,
-            List<ClassRelation> relations) {
-
-        // 隣接マップ（ソース→サクセッサ集合）を構築
-        Map<ClassInfo, Set<ClassInfo>> adjacency = new HashMap<>();
-        for (var rel : relations) {
-            ClassInfo layoutSrc = rel.type() == DependencyType.REALIZATION
-                ? rel.targetClassInfo()
-                : rel.sourceClassInfo();
-            ClassInfo layoutTgt = rel.type() == DependencyType.REALIZATION
-                ? rel.sourceClassInfo()
-                : rel.targetClassInfo();
-            adjacency.computeIfAbsent(layoutSrc, k -> new HashSet<>()).add(layoutTgt);
-        }
-
-        // Kahnレイヤーの逆順 = reverse topological order でdepthを計算
-        Map<ClassInfo, Integer> depth = new HashMap<>();
-        for (int i = kahnsLayers.size() - 1; i >= 0; i--) {
-            for (var node : kahnsLayers.get(i)) {
-                int maxSuccDepth = -1;
-                for (var succ : adjacency.getOrDefault(node, Set.of())) {
-                    maxSuccDepth = Math.max(maxSuccDepth, depth.getOrDefault(succ, 0));
-                }
-                depth.put(node, maxSuccDepth + 1);
-            }
-        }
-
-        int maxDepth = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        int numLayers = maxDepth + 1;
-
-        List<List<ClassInfo>> result = new ArrayList<>();
-        for (int i = 0; i < numLayers; i++) {
-            result.add(new ArrayList<>());
-        }
-        for (var entry : depth.entrySet()) {
-            int layerIdx = maxDepth - entry.getValue();
-            result.get(layerIdx).add(entry.getKey());
-        }
-
-        // 各レイヤー内を名前でソート（決定論的順序）
-        for (var layer : result) {
-            layer.sort(Comparator.comparing(ClassInfo::simpleName)
-                                 .thenComparing(ClassInfo::packageName));
-        }
-
-        return result;
-    }
-
-    /**
-     * 同一インタフェースを実装するクラスを同一レイヤーに揃える後処理。
-     *
-     * <p>2つ以上のインタフェースを実装するクラスは対象外。
-     * 対象グループが2クラス未満の場合も変更なし。
-     * 移動後に空になったレイヤーは除去する。
-     */
-    private List<List<ClassInfo>> equalizeImplementationLayers(
-            List<List<ClassInfo>> layers,
-            List<ClassRelation> relations) {
-
-        Map<ClassInfo, Integer> layerOf = new HashMap<>();
-        for (int i = 0; i < layers.size(); i++) {
-            for (var info : layers.get(i)) {
-                layerOf.put(info, i);
-            }
-        }
-
-        Map<ClassInfo, Long> ifaceCount = relations.stream()
-            .filter(r -> r.type() == DependencyType.REALIZATION)
-            .collect(Collectors.groupingBy(ClassRelation::sourceClassInfo, Collectors.counting()));
-
-        Map<ClassInfo, List<ClassInfo>> ifaceToImpls = new HashMap<>();
-        for (var rel : relations) {
-            if (rel.type() != DependencyType.REALIZATION) continue;
-            if (ifaceCount.get(rel.sourceClassInfo()) > 1L) continue;
-            ifaceToImpls.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
-                        .add(rel.sourceClassInfo());
-        }
-
-        for (var impls : ifaceToImpls.values()) {
-            if (impls.size() < 2) continue;
-            int minLayer = impls.stream()
-                .mapToInt(layerOf::get)
-                .min()
-                .getAsInt();
-            for (var impl : impls) {
-                layerOf.put(impl, minLayer);
-            }
-        }
-
-        int numLayers = layers.size();
-        List<List<ClassInfo>> result = new ArrayList<>();
-        for (int i = 0; i < numLayers; i++) {
-            result.add(new ArrayList<>());
-        }
-        for (var entry : layerOf.entrySet()) {
-            result.get(entry.getValue()).add(entry.getKey());
-        }
-        for (var layer : result) {
-            layer.sort(Comparator.comparing(ClassInfo::simpleName)
-                                 .thenComparing(ClassInfo::packageName));
-        }
-        result.removeIf(List::isEmpty);
-        return result;
     }
 }

@@ -32,9 +32,10 @@ class ClassDiagramLayoutTest {
     }
 
     @Test
-    void layoutLongestPathReassignment() {
-        // A→B→D, A→C  (C is a leaf like D)
-        // Kahn: [[A],[B,C],[D]] — longest-path must produce [[A],[B],[C,D]]
+    void layoutPlacesSiblingChildrenAtSameLayer() {
+        // A→B→D, A→C: Kahn produces [[A],[B,C],[D]]
+        // B and C are both direct children of A → same layer
+        // D is child of B → one layer below B
         var a = ci("A"); var b = ci("B"); var c = ci("C"); var d = ci("D");
         var rels = List.of(rel(a, b), rel(b, d), rel(a, c));
         var layers = new ClassRelationSorter().sort(rels);
@@ -45,11 +46,11 @@ class ClassDiagramLayoutTest {
         var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
         var boxD = result.boxes().stream().filter(bx -> bx.name().equals("D")).findFirst().orElseThrow();
 
-        // C and D must be in the same bottom layer (same y)
-        assertEquals(boxC.y(), boxD.y());
-        // Layers flow top to bottom: A < B < C/D
+        // B and C are siblings (both direct children of A) → same layer
+        assertEquals(boxB.y(), boxC.y());
+        // Layers flow top to bottom: A < B/C < D
         assertTrue(boxA.y() < boxB.y());
-        assertTrue(boxB.y() < boxC.y());
+        assertTrue(boxB.y() < boxD.y());
     }
 
     @Test
@@ -122,10 +123,9 @@ class ClassDiagramLayoutTest {
     }
 
     @Test
-    void equalizesCoImplementationsToSameLayer() {
+    void coImplementationsSameInterfaceLandAtSameLayer() {
         // IFoo (interface), FooImplA (implements IFoo + owns LeafA), FooImplB (implements IFoo only)
-        // After longest-path reassignment: IFoo=layer0, FooImplA=layer1, FooImplB=layer2, LeafA=layer2
-        // After equalization: both FooImplA and FooImplB must be at layer1 (the shallower one)
+        // Kahn: [[IFoo], [FooImplA, FooImplB], [LeafA]] — both impls are direct children of IFoo
         var iface = ci("IFoo");
         var implA = ci("FooImplA");
         var implB = ci("FooImplB");
@@ -141,60 +141,6 @@ class ClassDiagramLayoutTest {
         var boxImplA = result.boxes().stream().filter(b -> b.name().equals("FooImplA")).findFirst().orElseThrow();
         var boxImplB = result.boxes().stream().filter(b -> b.name().equals("FooImplB")).findFirst().orElseThrow();
         assertEquals(boxImplA.y(), boxImplB.y(),
-            "Both impls of IFoo must be at the same layer after equalization");
-    }
-
-    @Test
-    void doesNotEqualizeImplWithMultipleInterfaces() {
-        // IFoo, IBar (two interfaces)
-        // FooImplA: implements IFoo only (+ owns Leaf → lands at layer1 after longest-path)
-        // FooImplB: implements IFoo only (no other relations → lands at layer2)
-        // FooBarImpl: implements both IFoo and IBar → excluded from equalization, stays at layer2
-        // After equalization: FooImplA and FooImplB equalized to layer1; FooBarImpl stays deeper
-        var iface1 = ci("IFoo");
-        var iface2 = ci("IBar");
-        var implA = ci("FooImplA");
-        var implB = ci("FooImplB");
-        var multiImpl = ci("FooBarImpl");
-        var leaf = ci("Leaf");
-        var rels = List.of(
-            new ClassRelation(implA, iface1, DependencyType.REALIZATION, false),
-            new ClassRelation(implB, iface1, DependencyType.REALIZATION, false),
-            new ClassRelation(multiImpl, iface1, DependencyType.REALIZATION, false),
-            new ClassRelation(multiImpl, iface2, DependencyType.REALIZATION, false),
-            new ClassRelation(implA, leaf, DependencyType.COMPOSITION, false)
-        );
-        var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
-
-        var boxImplA = result.boxes().stream().filter(b -> b.name().equals("FooImplA")).findFirst().orElseThrow();
-        var boxImplB = result.boxes().stream().filter(b -> b.name().equals("FooImplB")).findFirst().orElseThrow();
-        var boxMulti = result.boxes().stream().filter(b -> b.name().equals("FooBarImpl")).findFirst().orElseThrow();
-        assertEquals(boxImplA.y(), boxImplB.y(),
-            "FooImplA and FooImplB (single-interface) must be equalized to the same layer");
-        assertTrue(boxMulti.y() > boxImplA.y(),
-            "FooBarImpl (multi-interface) must not be equalized and must remain deeper");
-    }
-
-    @Test
-    void removesEmptyLayersAfterEqualization() {
-        // IFoo (interface), FooImplA (implements IFoo + owns FooImplB), FooImplB (implements IFoo)
-        // After longest-path: IFoo=layer0, FooImplA=layer1, FooImplB=layer2
-        // After equalization: FooImplB moves to layer1 → layer2 becomes empty → must be dropped
-        // Result: exactly 2 distinct y-values in boxes
-        var iface = ci("IFoo");
-        var implA = ci("FooImplA");
-        var implB = ci("FooImplB");
-        var rels = List.of(
-            new ClassRelation(implA, iface, DependencyType.REALIZATION, false),
-            new ClassRelation(implB, iface, DependencyType.REALIZATION, false),
-            new ClassRelation(implA, implB, DependencyType.COMPOSITION, false)
-        );
-        var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
-
-        long distinctYCount = result.boxes().stream().mapToInt(ClassBox::y).distinct().count();
-        assertEquals(2, distinctYCount,
-            "Empty layer after equalization must be removed, leaving exactly 2 distinct y-values");
+            "Co-implementations of the same interface must be at the same layer");
     }
 }

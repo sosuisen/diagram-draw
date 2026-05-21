@@ -104,4 +104,20 @@ class ClassDiagramLayoutTest {
         assertEquals(1, result.dependencies().size());
         assertEquals(DependencyType.COMPOSITION, result.dependencies().get(0).type());
     }
+
+    @Test
+    void layoutPlacesInterfaceAboveImplementationForRealization() {
+        var iface = ci("IFoo");
+        var impl = ci("FooImpl");
+        var rel = new ClassRelation(impl, iface, DependencyType.REALIZATION, false);
+        var layers = new ClassRelationSorter().sort(List.of(rel));
+        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, List.of(rel));
+
+        var ifaceBox = result.boxes().stream()
+            .filter(b -> b.name().equals("IFoo")).findFirst().orElseThrow();
+        var implBox = result.boxes().stream()
+            .filter(b -> b.name().equals("FooImpl")).findFirst().orElseThrow();
+        assertTrue(ifaceBox.y() < implBox.y(),
+            "Interface y=%d must be less than impl y=%d".formatted(ifaceBox.y(), implBox.y()));
+    }
 }

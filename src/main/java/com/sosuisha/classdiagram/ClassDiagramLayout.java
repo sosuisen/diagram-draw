@@ -147,8 +147,13 @@ public class ClassDiagramLayout {
         // 隣接マップ（ソース→サクセッサ集合）を構築
         Map<ClassInfo, Set<ClassInfo>> adjacency = new HashMap<>();
         for (var rel : relations) {
-            adjacency.computeIfAbsent(rel.sourceClassInfo(), k -> new HashSet<>())
-                     .add(rel.targetClassInfo());
+            ClassInfo layoutSrc = rel.type() == DependencyType.REALIZATION
+                ? rel.targetClassInfo()
+                : rel.sourceClassInfo();
+            ClassInfo layoutTgt = rel.type() == DependencyType.REALIZATION
+                ? rel.sourceClassInfo()
+                : rel.targetClassInfo();
+            adjacency.computeIfAbsent(layoutSrc, k -> new HashSet<>()).add(layoutTgt);
         }
 
         // Kahnレイヤーの逆順 = reverse topological order でdepthを計算

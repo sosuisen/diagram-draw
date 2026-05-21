@@ -185,7 +185,7 @@ public final class Dependency implements SvgElement {
         double by2 = baseCy - py * TRIANGLE_HALF_WIDTH;
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"realization\">");
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
         sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
             sp[0], sp[1], baseCx, baseCy));
         sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"black\"/>".formatted(

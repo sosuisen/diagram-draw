@@ -8,7 +8,7 @@ import java.util.Objects;
  *
  * @param sourceClassInfo フィールドを持つクラス（所有側）
  * @param targetClassInfo フィールドの型クラス（所有される側）
- * @param type            COMPOSITION または AGGREGATION
+ * @param type            COMPOSITION、AGGREGATION、または REALIZATION
  * @param isMany          コレクションフィールドの場合true
  * @throws NullPointerException sourceClassInfo、targetClassInfo、またはtypeがnullの場合
  */

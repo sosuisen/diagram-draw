@@ -61,10 +61,10 @@ public class ClassDiagramLayout {
         // Step 1: 最長パス法でレイヤーを再割り当て
         var reassigned = reassignLayers(layers, relations);
 
-        // Step 1.5: 同一インタフェースを実装するクラスを同一レイヤーに揃える
+        // Step 2: 同一インタフェースを実装するクラスを同一レイヤーに揃える
         reassigned = equalizeImplementationLayers(reassigned, relations);
 
-        // Step 2: ClassInfo → ClassBox マップ作成（挿入順保持）
+        // Step 3: ClassInfo → ClassBox マップ作成（挿入順保持）
         Map<ClassInfo, ClassBox> boxMap = new LinkedHashMap<>();
         for (var layer : reassigned) {
             for (var info : layer) {
@@ -72,7 +72,7 @@ public class ClassDiagramLayout {
             }
         }
 
-        // Step 3: レイヤーごとに幅と最大高さを計算
+        // Step 4: レイヤーごとに幅と最大高さを計算
         int numLayers = reassigned.size();
         int[] maxBoxHeight = new int[numLayers];
         int[] layerWidth = new int[numLayers];
@@ -99,7 +99,7 @@ public class ClassDiagramLayout {
             canvasContentWidth = Math.max(canvasContentWidth, w);
         }
 
-        // Step 4: 中央揃えで各ボックスに座標を設定
+        // Step 5: 中央揃えで各ボックスに座標を設定
         int currentY = canvasPaddingY;
         for (int i = 0; i < numLayers; i++) {
             var layer = reassigned.get(i);
@@ -113,14 +113,14 @@ public class ClassDiagramLayout {
             currentY += maxBoxHeight[i] + verticalGap;
         }
 
-        // Step 5: キャンバスサイズ計算
+        // Step 6: キャンバスサイズ計算
         int totalHeight = 0;
         for (int h : maxBoxHeight) totalHeight += h;
         totalHeight += (numLayers - 1) * verticalGap;
         int canvasWidth = canvasContentWidth + 2 * canvasPaddingX;
         int canvasHeight = totalHeight + 2 * canvasPaddingY;
 
-        // Step 6: Dependency 生成
+        // Step 7: Dependency 生成
         var dependencies = new ArrayList<Dependency>();
         for (var rel : relations) {
             var src = boxMap.get(rel.sourceClassInfo());
@@ -218,7 +218,7 @@ public class ClassDiagramLayout {
         Map<ClassInfo, List<ClassInfo>> ifaceToImpls = new HashMap<>();
         for (var rel : relations) {
             if (rel.type() != DependencyType.REALIZATION) continue;
-            if (ifaceCount.getOrDefault(rel.sourceClassInfo(), 0L) != 1L) continue;
+            if (ifaceCount.get(rel.sourceClassInfo()) > 1L) continue;
             ifaceToImpls.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
                         .add(rel.sourceClassInfo());
         }
@@ -226,9 +226,9 @@ public class ClassDiagramLayout {
         for (var impls : ifaceToImpls.values()) {
             if (impls.size() < 2) continue;
             int minLayer = impls.stream()
-                .mapToInt(impl -> layerOf.getOrDefault(impl, 0))
+                .mapToInt(layerOf::get)
                 .min()
-                .orElse(0);
+                .getAsInt();
             for (var impl : impls) {
                 layerOf.put(impl, minLayer);
             }

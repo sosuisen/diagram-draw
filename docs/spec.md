@@ -405,3 +405,7 @@ var svg = new SVGBuilder(400, 200)
 - 計算量: O(passes × E)、NP困難な厳密最適化の近似として実用的
 
 **実装方針**: `ClassDiagramLayout` に private メソッド `minimizeCrossings()` を追加し、Step 1（ボックスマップ作成）の直後に呼び出す。
+
+### 複数のグラフの分離
+
+お互いに関わらない複数のグラフが混じっているので分離する。

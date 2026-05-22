@@ -111,4 +111,34 @@ class DependencyTest {
         assertTrue(svg.contains("<polygon"));
         assertTrue(svg.contains("fill=\"white\""));
     }
+
+    private static Dependency dependencyDep() {
+        var source = new ClassBox("OrderService");
+        source.setPosition(50, 200);
+        var target = new ClassBox("InventoryRepo");
+        target.setPosition(50, 0);
+        return new Dependency(source, target, DependencyType.DEPENDENCY);
+    }
+
+    @Test
+    void drawDependencyHasDataAttribute() {
+        assertTrue(dependencyDep().draw().contains("data-diagram-draw-type=\"dependency\""));
+    }
+
+    @Test
+    void drawDependencyHasDashedLine() {
+        assertTrue(dependencyDep().draw().contains("stroke-dasharray"));
+    }
+
+    @Test
+    void drawDependencyHasOpenArrowhead() {
+        var svg = dependencyDep().draw();
+        assertTrue(svg.contains("<polyline"));
+        assertTrue(svg.contains("fill=\"none\""));
+    }
+
+    @Test
+    void drawDependencyHasNoFilledDiamond() {
+        assertFalse(dependencyDep().draw().contains("fill=\"black\""));
+    }
 }

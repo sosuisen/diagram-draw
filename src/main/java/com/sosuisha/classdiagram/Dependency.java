@@ -14,6 +14,8 @@ public final class Dependency implements SvgElement {
     private static final int DIAMOND_HALF_WIDTH = 5;
     private static final int TRIANGLE_LEN = 20;
     private static final int TRIANGLE_HALF_WIDTH = 8;
+    private static final int ARROWHEAD_LEN = 10;
+    private static final double ARROWHEAD_HALF_ANGLE = Math.PI / 6.0; // 30 degrees
 
     private final ClassBox source;
     private final ClassBox target;
@@ -79,6 +81,10 @@ public final class Dependency implements SvgElement {
 
         if (type == DependencyType.REALIZATION) {
             return drawRealization(sp, tp, nx, ny);
+        }
+
+        if (type == DependencyType.DEPENDENCY) {
+            return drawDependency(sp, tp, nx, ny);
         }
 
         // ダイアモンドの後端をソース辺上に合わせ、全体をボックス外に配置する
@@ -190,6 +196,23 @@ public final class Dependency implements SvgElement {
             sp[0], sp[1], baseCx, baseCy));
         sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"black\"/>".formatted(
             tp[0], tp[1], bx1, by1, bx2, by2));
+        sb.append("</g>");
+        return sb.toString();
+    }
+
+    private String drawDependency(double[] sp, double[] tp, double nx, double ny) {
+        double angle = Math.atan2(ny, nx);
+        double ax1 = tp[0] - ARROWHEAD_LEN * Math.cos(angle - ARROWHEAD_HALF_ANGLE);
+        double ay1 = tp[1] - ARROWHEAD_LEN * Math.sin(angle - ARROWHEAD_HALF_ANGLE);
+        double ax2 = tp[0] - ARROWHEAD_LEN * Math.cos(angle + ARROWHEAD_HALF_ANGLE);
+        double ay2 = tp[1] - ARROWHEAD_LEN * Math.sin(angle + ARROWHEAD_HALF_ANGLE);
+
+        var sb = new StringBuilder();
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
+        sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
+            sp[0], sp[1], tp[0], tp[1]));
+        sb.append("<polyline points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"none\" stroke=\"black\"/>".formatted(
+            ax1, ay1, tp[0], tp[1], ax2, ay2));
         sb.append("</g>");
         return sb.toString();
     }

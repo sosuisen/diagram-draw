@@ -9,5 +9,7 @@ public enum DependencyType {
     /** 集約（弱い所有関係）*/
     AGGREGATION,
     /** 実現（インタフェースと実装クラスの関係）*/
-    REALIZATION
+    REALIZATION,
+    /** 依存（ローカル変数・メソッドパラメータ経由の使用関係）*/
+    DEPENDENCY
 }

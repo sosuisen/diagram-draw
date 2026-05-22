@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram;
 
+import com.sosuisha.classdiagram.analyzer.ConnectedComponentSplitter;
 import com.sosuisha.classdiagram.analyzer.ClassRelationScanner;
 import com.sosuisha.classdiagram.analyzer.ClassRelationSorter;
 import java.nio.file.Path;
@@ -8,8 +9,8 @@ import java.util.Objects;
 /**
  * クラス図SVGを生成するファサード。
  *
- * <p>ClassRelationScanner → ClassRelationSorter → ClassDiagramLayout → SVGBuilder の
- * パイプラインを一括実行し、SVG文字列を返す。
+ * <p>ClassRelationScanner → ConnectedComponentSplitter → ClassRelationSorter
+ * → ClassDiagramLayout → SVGBuilder のパイプラインを一括実行し、SVG文字列を返す。
  */
 public class ClassDiagramGenerator {
 
@@ -17,6 +18,7 @@ public class ClassDiagramGenerator {
     private final int verticalGap;
     private final int canvasPaddingX;
     private final int canvasPaddingY;
+    private final int groupGap;
     private String fontFamily = null;
 
     /**
@@ -26,13 +28,15 @@ public class ClassDiagramGenerator {
      * @param verticalGap    レイヤー間の垂直隙間（px）
      * @param canvasPaddingX キャンバス左右の余白（px）
      * @param canvasPaddingY キャンバス上下の余白（px）
+     * @param groupGap       連結成分グループ間の水平隙間（px）
      */
     public ClassDiagramGenerator(int horizontalGap, int verticalGap,
-                                  int canvasPaddingX, int canvasPaddingY) {
+                                  int canvasPaddingX, int canvasPaddingY, int groupGap) {
         this.horizontalGap = horizontalGap;
         this.verticalGap = verticalGap;
         this.canvasPaddingX = canvasPaddingX;
         this.canvasPaddingY = canvasPaddingY;
+        this.groupGap = groupGap;
     }
 
     /**
@@ -68,8 +72,9 @@ public class ClassDiagramGenerator {
             return builder.build();
         }
 
+        new ConnectedComponentSplitter().split(relations);
         var layers = new ClassRelationSorter().sort(relations);
-        var result = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY)
+        var result = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY, groupGap)
                          .layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
         if (fontFamily != null) builder.fontFamily(fontFamily);

@@ -149,4 +149,12 @@ class ClassInfoTest {
         b.addDependencyTargetFqn("com.example.Bar");
         assertEquals(a.hashCode(), b.hashCode());
     }
+
+    @Test
+    void addDependencyTargetFqnDeduplicates() {
+        var info = new ClassInfo("com.example", "Foo");
+        info.addDependencyTargetFqn("com.example.Bar");
+        info.addDependencyTargetFqn("com.example.Bar");
+        assertEquals(1, info.dependencyTargetFqns().size());
+    }
 }

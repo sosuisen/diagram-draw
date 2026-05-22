@@ -1,12 +1,9 @@
 package com.sosuisha.classdiagram.analyzer;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * {@link ClassRelation} のリストから連結成分を検出し、
@@ -48,15 +45,10 @@ public class ConnectedComponentSplitter {
             }
         }
 
-        // 全 ClassInfo インスタンス（重複含む）に groupIndex を設定
-        Set<ClassInfo> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        // 全 ClassInfo インスタンスに groupIndex を設定（重複呼び出しは無害）
         for (var rel : relations) {
-            for (var info : List.of(rel.sourceClassInfo(), rel.targetClassInfo())) {
-                if (visited.add(info)) {
-                    var root = find(parent, info);
-                    info.setGroupIndex(rootToGroup.get(root));
-                }
-            }
+            rel.sourceClassInfo().setGroupIndex(rootToGroup.get(find(parent, rel.sourceClassInfo())));
+            rel.targetClassInfo().setGroupIndex(rootToGroup.get(find(parent, rel.targetClassInfo())));
         }
 
         return relations;

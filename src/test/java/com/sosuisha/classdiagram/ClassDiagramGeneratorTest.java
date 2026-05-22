@@ -60,4 +60,15 @@ class ClassDiagramGeneratorTest {
         assertTrue(svg.contains("«interface»"),
             "SVG must contain «interface» stereotype label for FixtureService");
     }
+
+    @Test
+    void generateIncludesCrossGroupDependencyArrowForFixdepPackage() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixdep");
+        assertTrue(svg.contains("data-diagram-draw-type=\"dependency\""),
+            "SVG must contain a cross-group DEPENDENCY arrow for fixdep package");
+        assertTrue(svg.contains("stroke-dasharray"),
+            "DEPENDENCY arrow must use a dashed line");
+    }
 }

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * コンパイル済みクラスファイルをリフレクションで分析し、コンポジション・集約・実現関係を返すスキャナー。
@@ -72,9 +73,11 @@ public class ClassRelationScanner {
                 stereotypes.getOrDefault(className, ClassStereotype.NONE));
             var constructorParamTypeNames = collectConstructorParamTypeNames(model);
 
+            var fieldFqns = new HashSet<String>();
             for (var field : model.fields()) {
                 var resolved = resolveFieldTarget(field, targetClassNames);
                 if (resolved == null) continue;
+                fieldFqns.add(resolved.targetClassName());
 
                 var targetInfo = ClassInfo.fromFullyQualifiedName(resolved.targetClassName(),
                     stereotypes.getOrDefault(resolved.targetClassName(), ClassStereotype.NONE));
@@ -82,6 +85,10 @@ public class ClassRelationScanner {
                     ? DependencyType.AGGREGATION
                     : DependencyType.COMPOSITION;
                 relations.add(new ClassRelation(sourceInfo, targetInfo, type, resolved.isMany()));
+            }
+
+            for (var fqn : collectDependencyFqns(model, targetClassNames, fieldFqns, className)) {
+                sourceInfo.addDependencyTargetFqn(fqn);
             }
 
             for (var iface : model.interfaces()) {
@@ -180,6 +187,88 @@ public class ClassRelationScanner {
 
     private static String internalNameToBinary(String internalName) {
         return internalName.replace('/', '.');
+    }
+
+    private static final Pattern CLASS_TYPE_PATTERN = Pattern.compile("L([^<;>]+)");
+
+    private static Set<String> extractFqnsFromSignature(String sig) {
+        var result = new HashSet<String>();
+        var matcher = CLASS_TYPE_PATTERN.matcher(sig);
+        while (matcher.find()) {
+            result.add(matcher.group(1).replace('/', '.'));
+        }
+        return result;
+    }
+
+    private static String extractParamSection(String methodSig) {
+        int start = methodSig.indexOf('(');
+        if (start < 0) return "";
+        int depth = 0;
+        for (int i = start + 1; i < methodSig.length(); i++) {
+            char c = methodSig.charAt(i);
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ')' && depth == 0) {
+                return methodSig.substring(start + 1, i);
+            }
+        }
+        return "";
+    }
+
+    private static void addIfDependency(String fqn, Set<String> targetClassNames,
+                                         Set<String> fieldFqns, String selfFqn,
+                                         Set<String> result) {
+        if (targetClassNames.contains(fqn) && !fieldFqns.contains(fqn) && !fqn.equals(selfFqn)) {
+            result.add(fqn);
+        }
+    }
+
+    private static Set<String> collectDependencyFqns(ClassModel model,
+                                                       Set<String> targetClassNames,
+                                                       Set<String> fieldFqns,
+                                                       String selfFqn) {
+        var result = new HashSet<String>();
+        for (var method : model.methods()) {
+            // 1. Non-generic parameter types from method descriptor
+            var desc = method.methodTypeSymbol();
+            for (int i = 0; i < desc.parameterCount(); i++) {
+                addIfDependency(classDescToBinaryName(desc.parameterType(i)),
+                    targetClassNames, fieldFqns, selfFqn, result);
+            }
+            // 2. Generic parameter types from method Signature attribute
+            var sigAttr = method.findAttribute(Attributes.signature());
+            if (sigAttr.isPresent()) {
+                var paramSection = extractParamSection(sigAttr.get().signature().stringValue());
+                for (var fqn : extractFqnsFromSignature(paramSection)) {
+                    addIfDependency(fqn, targetClassNames, fieldFqns, selfFqn, result);
+                }
+            }
+            // 3. Local variable types from Code attribute
+            var codeAttr = method.findAttribute(Attributes.code());
+            if (codeAttr.isPresent()) {
+                var code = codeAttr.get();
+                // Non-generic local variables
+                var lvt = code.findAttribute(Attributes.localVariableTable());
+                if (lvt.isPresent()) {
+                    for (var lv : lvt.get().localVariables()) {
+                        if (!lv.typeSymbol().isPrimitive() && !lv.typeSymbol().isArray()) {
+                            addIfDependency(classDescToBinaryName(lv.typeSymbol()),
+                                targetClassNames, fieldFqns, selfFqn, result);
+                        }
+                    }
+                }
+                // Generic local variables
+                var lvtt = code.findAttribute(Attributes.localVariableTypeTable());
+                if (lvtt.isPresent()) {
+                    for (var lv : lvtt.get().localVariableTypes()) {
+                        for (var fqn : extractFqnsFromSignature(lv.signature().stringValue())) {
+                            addIfDependency(fqn, targetClassNames, fieldFqns, selfFqn, result);
+                        }
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     private static Set<String> collectClassNames(Path classRoot, Path packageDir) {

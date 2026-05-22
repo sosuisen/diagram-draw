@@ -126,4 +126,54 @@ class ClassRelationScannerTest {
             .orElseThrow();
         assertEquals(ClassStereotype.NONE, implInfo.stereotype());
     }
+
+    private static final String FIXDEP_PKG = "com.sosuisha.classdiagram.analyzer.fixdep";
+
+    @Test
+    void scanDetectsDependencyFqnForLocalVariable() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXDEP_PKG);
+        var src = relations.stream()
+            .filter(r -> r.sourceClassInfo().simpleName().equals("FixtureDepSource"))
+            .map(ClassRelation::sourceClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertTrue(src.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepTarget"),
+            "FixtureDepTarget must be in dependencyTargetFqns (local var in process())");
+    }
+
+    @Test
+    void scanDetectsDependencyFqnForMethodParam() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXDEP_PKG);
+        var src = relations.stream()
+            .filter(r -> r.sourceClassInfo().simpleName().equals("FixtureDepSource"))
+            .map(ClassRelation::sourceClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertTrue(src.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepTargetPart"),
+            "FixtureDepTargetPart must be in dependencyTargetFqns (param in check())");
+    }
+
+    @Test
+    void scanExcludesFieldTypeFromDependencyFqns() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXDEP_PKG);
+        var src = relations.stream()
+            .filter(r -> r.sourceClassInfo().simpleName().equals("FixtureDepSource"))
+            .map(ClassRelation::sourceClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertFalse(src.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepSourcePart"),
+            "FixtureDepSourcePart is a stored field — must NOT be in dependencyTargetFqns");
+    }
+
+    @Test
+    void scanDoesNotIncludeSelfInDependencyFqns() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXDEP_PKG);
+        var src = relations.stream()
+            .filter(r -> r.sourceClassInfo().simpleName().equals("FixtureDepSource"))
+            .map(ClassRelation::sourceClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertFalse(src.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepSource"),
+            "A class must not depend on itself");
+    }
 }

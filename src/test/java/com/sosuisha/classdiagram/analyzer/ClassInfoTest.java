@@ -107,4 +107,46 @@ class ClassInfoTest {
         var info = new ClassInfo("com.example", "Foo");
         assertThrows(IllegalArgumentException.class, () -> info.setGroupIndex(-1));
     }
+
+    @Test
+    void dependencyTargetFqnsDefaultsToEmpty() {
+        var info = new ClassInfo("com.example", "Foo");
+        assertTrue(info.dependencyTargetFqns().isEmpty());
+    }
+
+    @Test
+    void addDependencyTargetFqnAddsToSet() {
+        var info = new ClassInfo("com.example", "Foo");
+        info.addDependencyTargetFqn("com.example.Bar");
+        assertTrue(info.dependencyTargetFqns().contains("com.example.Bar"));
+    }
+
+    @Test
+    void addDependencyTargetFqnThrowsForNull() {
+        var info = new ClassInfo("com.example", "Foo");
+        assertThrows(NullPointerException.class, () -> info.addDependencyTargetFqn(null));
+    }
+
+    @Test
+    void dependencyTargetFqnsIsUnmodifiable() {
+        var info = new ClassInfo("com.example", "Foo");
+        assertThrows(UnsupportedOperationException.class,
+            () -> info.dependencyTargetFqns().add("com.example.Bar"));
+    }
+
+    @Test
+    void equalsIgnoresDependencyTargetFqns() {
+        var a = new ClassInfo("com.example", "Foo");
+        var b = new ClassInfo("com.example", "Foo");
+        b.addDependencyTargetFqn("com.example.Bar");
+        assertEquals(a, b);
+    }
+
+    @Test
+    void hashCodeIgnoresDependencyTargetFqns() {
+        var a = new ClassInfo("com.example", "Foo");
+        var b = new ClassInfo("com.example", "Foo");
+        b.addDependencyTargetFqn("com.example.Bar");
+        assertEquals(a.hashCode(), b.hashCode());
+    }
 }

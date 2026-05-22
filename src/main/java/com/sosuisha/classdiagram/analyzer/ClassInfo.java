@@ -1,7 +1,10 @@
 package com.sosuisha.classdiagram.analyzer;
 
 import com.sosuisha.classdiagram.ClassStereotype;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * クラスのパッケージ名・単純名・ステレオタイプを保持する識別子。
@@ -15,6 +18,7 @@ public final class ClassInfo {
     private final String simpleName;
     private final ClassStereotype stereotype;
     private int groupIndex;
+    private final Set<String> dependencyTargetFqns = new LinkedHashSet<>();
 
     /**
      * ClassInfoを生成する。
@@ -64,6 +68,22 @@ public final class ClassInfo {
             throw new IllegalArgumentException("groupIndex must be >= 0: " + groupIndex);
         }
         this.groupIndex = groupIndex;
+    }
+
+    /**
+     * dependency依存先のFQNを追加する。{@link ClassRelationScanner} が呼び出す。
+     *
+     * @param fqn 完全修飾名
+     * @throws NullPointerException fqnがnullの場合
+     */
+    public void addDependencyTargetFqn(String fqn) {
+        Objects.requireNonNull(fqn, "fqn must not be null");
+        dependencyTargetFqns.add(fqn);
+    }
+
+    /** @return dependency依存先のFQNセット（変更不可） */
+    public Set<String> dependencyTargetFqns() {
+        return Collections.unmodifiableSet(dependencyTargetFqns);
     }
 
     /**

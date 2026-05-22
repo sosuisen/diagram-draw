@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,6 +165,24 @@ public class ClassDiagramLayout {
             var tgt = boxMap.get(rel.targetClassInfo());
             if (src != null && tgt != null) {
                 dependencies.add(new Dependency(src, tgt, rel.type()));
+            }
+        }
+
+        // Step 8: cross-group DEPENDENCY 矢印生成
+        Map<String, ClassInfo> fqnToInfo = new HashMap<>();
+        for (var info : boxMap.keySet()) {
+            fqnToInfo.put(info.packageName() + "." + info.simpleName(), info);
+        }
+        for (var srcInfo : boxMap.keySet()) {
+            for (var fqn : srcInfo.dependencyTargetFqns()) {
+                var tgtInfo = fqnToInfo.get(fqn);
+                if (tgtInfo == null) continue;
+                if (srcInfo.groupIndex() == tgtInfo.groupIndex()) continue;
+                var src = boxMap.get(srcInfo);
+                var tgt = boxMap.get(tgtInfo);
+                if (src != null && tgt != null) {
+                    dependencies.add(new Dependency(src, tgt, DependencyType.DEPENDENCY));
+                }
             }
         }
 

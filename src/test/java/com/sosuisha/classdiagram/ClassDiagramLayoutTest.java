@@ -202,4 +202,51 @@ class ClassDiagramLayoutTest {
         assertEquals(result0.canvasWidth(),  result100.canvasWidth());
         assertEquals(result0.canvasHeight(), result100.canvasHeight());
     }
+
+    @Test
+    void layoutCreatesDependencyArrowForCrossGroupFqn() {
+        var a = ci("A"); var b = ci("B");
+        var x = ci("X"); var y = ci("Y");
+        x.setGroupIndex(1); y.setGroupIndex(1);
+        // A depends on X (cross-group: group 0 → group 1)
+        a.addDependencyTargetFqn(PKG + ".X");
+
+        var rels = List.of(rel(a, b), rel(x, y));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        assertTrue(result.dependencies().stream().anyMatch(d ->
+            d.source().name().equals("A")
+            && d.target().name().equals("X")
+            && d.type() == DependencyType.DEPENDENCY),
+            "Cross-group FQN must produce a DEPENDENCY arrow from A to X");
+    }
+
+    @Test
+    void layoutDoesNotCreateDependencyArrowForSameGroupFqn() {
+        var a = ci("A"); var b = ci("B");
+        // A depends on B (same group 0)
+        a.addDependencyTargetFqn(PKG + ".B");
+
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        assertTrue(result.dependencies().stream().noneMatch(d -> d.type() == DependencyType.DEPENDENCY),
+            "Same-group FQN must not produce a DEPENDENCY arrow");
+    }
+
+    @Test
+    void layoutIgnoresUnresolvableDependencyFqn() {
+        var a = ci("A"); var b = ci("B");
+        a.addDependencyTargetFqn("com.example.NonExistent");
+
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // must not throw
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        assertTrue(result.dependencies().stream().noneMatch(d -> d.type() == DependencyType.DEPENDENCY),
+            "Unresolvable FQN must be silently ignored");
+    }
 }

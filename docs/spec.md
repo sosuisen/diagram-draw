@@ -24,10 +24,11 @@ com.sosuisha.classdiagram
 ├── ClassDiagramLayout.java      レイアウトエンジン
 ├── ClassDiagramGenerator.java   ファサード（一括生成API）
 └── analyzer/
-    ├── ClassInfo.java           クラス識別子（record）
+    ├── ClassInfo.java           クラス識別子（final class）
     ├── ClassRelation.java       クラス間関係（record）
     ├── ClassRelationScanner.java .classファイルスキャナー
     ├── ClassRelationSorter.java  トポロジカルソーター
+    ├── ConnectedComponentSplitter.java 連結成分分割器
     └── CircularRelationException.java 循環参照例外
 ```
 
@@ -184,24 +185,23 @@ public String build()                             // SVG文字列を返す
 
 `.class` ファイルを解析してクラス間関係を抽出する。Java Class-File API を使用（リフレクション不使用）。
 
-### `ClassInfo` record
+### `ClassInfo` クラス
 
-クラスのパッケージ名と単純名を保持する識別子。
+クラスのパッケージ名と単純名を保持する識別子。`final class` として実装。
 
 ```java
-public record ClassInfo(String packageName, String simpleName, ClassStereotype stereotype)
+public ClassInfo(String packageName, String simpleName)
+public ClassInfo(String packageName, String simpleName, ClassStereotype stereotype)
 
-// 完全修飾名から生成（stereotype = NONE）
+// 完全修飾名から生成（stereotype = NONE, groupIndex = 0）
 ClassInfo.fromFullyQualifiedName("com.example.Order")
-// → ClassInfo("com.example", "Order", ClassStereotype.NONE)
-
-// 完全修飾名とステレオタイプから生成
 ClassInfo.fromFullyQualifiedName("com.example.IService", ClassStereotype.INTERFACE)
-// → ClassInfo("com.example", "IService", ClassStereotype.INTERFACE)
 
-// 後方互換2引数コンストラクタ（stereotype = NONE）
-new ClassInfo("com.example", "Order")
+int idx = info.groupIndex();   // デフォルト 0
+info.setGroupIndex(1);         // ConnectedComponentSplitter が呼び出す
 ```
+
+`equals`/`hashCode` は `packageName + simpleName + stereotype` のみ（`groupIndex` 除外）。
 
 ---
 
@@ -238,6 +238,21 @@ List<ClassRelation> scan(Path classRoot, String packageName)
 #### 検出するコレクション型
 
 `Collection`, `List`, `Set`, `Queue`, `Deque`, `ArrayList`, `LinkedList`, `HashSet`, `LinkedHashSet`, `TreeSet`, `ArrayDeque`
+
+---
+
+### `ConnectedComponentSplitter` クラス
+
+`ClassRelation` のリストを走査して無向グラフの連結成分を検出し、
+各 `ClassInfo` の `groupIndex` を設定する。
+
+```java
+List<ClassRelation> split(List<ClassRelation> relations)
+```
+
+- relations をそのまま返す（ClassInfo の groupIndex が書き換わっている）
+- 先頭から最初に出現した成分が groupIndex=0
+- `@throws NullPointerException` relations が null の場合
 
 ---
 
@@ -279,17 +294,22 @@ public record LayoutResult(
 
 ```java
 public ClassDiagramLayout(int horizontalGap, int verticalGap,
-                           int canvasPaddingX, int canvasPaddingY)
+                           int canvasPaddingX, int canvasPaddingY, int groupGap)
 
 LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 ```
 
 #### レイアウトアルゴリズム
 
-1. **中央揃え**: 各レイヤーはキャンバス横方向に中央揃えで配置
-2. **キャンバスサイズ**: 全レイヤーの最大幅と全レイヤーの高さ合計から自動計算
+1. `groupIndex` ごとにサブレイヤーを構築（空レイヤーは除去）
+2. グループごとにコンテンツ幅・高さを計算
+3. グループを `groupGap` ピクセルの間隔で横並び配置（左→右）
+4. 各グループ内でレイヤーを中央揃え（グループ幅基準）
+5. 全グループを上揃え（y = `canvasPaddingY` から開始）
+6. キャンバス幅 = 全グループ幅合計 + `groupGap × (グループ数-1)` + `canvasPaddingX × 2`
+7. キャンバス高さ = 最も高いグループのコンテンツ高さ + `canvasPaddingY × 2`
 
-`ClassRelationSorter` が出力したKahn法レイヤーをそのまま使用する。
+グループが1つの場合は `groupGap` が使われず現在と同じ動作になる。
 
 ---
 
@@ -299,7 +319,7 @@ LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 
 ```java
 public ClassDiagramGenerator(int horizontalGap, int verticalGap,
-                               int canvasPaddingX, int canvasPaddingY)
+                               int canvasPaddingX, int canvasPaddingY, int groupGap)
 
 public ClassDiagramGenerator fontFamily(String fontFamily)
 public String generate(Path classRoot, String packageName)
@@ -310,6 +330,8 @@ public String generate(Path classRoot, String packageName)
 ```
 ClassRelationScanner.scan()
         ↓ List<ClassRelation>
+ConnectedComponentSplitter.split()
+        ↓ List<ClassRelation>  (groupIndex 設定済み)
 ClassRelationSorter.sort()
         ↓ List<List<ClassInfo>>
 ClassDiagramLayout.layout()
@@ -342,7 +364,7 @@ SVGBuilder.build()
 ### ファサードで自動生成（推奨）
 
 ```java
-String svg = new ClassDiagramGenerator(30, 50, 30, 30)
+String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
     .fontFamily("HackGen")
     .generate(Path.of("target/classes"), "com.example");
 ```
@@ -353,9 +375,11 @@ String svg = new ClassDiagramGenerator(30, 50, 30, 30)
 var relations = new ClassRelationScanner()
     .scan(Path.of("target/classes"), "com.example");
 
+new ConnectedComponentSplitter().split(relations);
+
 var layers = new ClassRelationSorter().sort(relations);
 
-var result = new ClassDiagramLayout(30, 50, 30, 30).layout(layers, relations);
+var result = new ClassDiagramLayout(30, 50, 30, 30, 60).layout(layers, relations);
 
 var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight())
     .fontFamily("HackGen");
@@ -406,6 +430,8 @@ var svg = new SVGBuilder(400, 200)
 
 **実装方針**: `ClassDiagramLayout` に private メソッド `minimizeCrossings()` を追加し、Step 1（ボックスマップ作成）の直後に呼び出す。
 
-### 複数のグラフの分離
+### 追加の意図を指示できるようにする
 
-お互いに関わらない複数のグラフが混じっているので分離する。
+SceneManagerはViewに弱い依存をしている。このことを指示しないと、今回の図は完成しない。
+というのも、Viewインタフェースの意図が判らなくなるため。
+それぞれ別々のグラフに属しているので、横向きの線になる。グラフ間の弱い依存の指示。

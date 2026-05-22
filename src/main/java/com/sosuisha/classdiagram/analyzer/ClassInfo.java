@@ -6,21 +6,29 @@ import java.util.Objects;
 /**
  * クラスのパッケージ名・単純名・ステレオタイプを保持する識別子。
  *
- * @param packageName パッケージ名（例: {@code "com.sosuisha.classdiagram"}）
- * @param simpleName  単純名（パッケージを除く。例: {@code "Order"}）
- * @param stereotype  ステレオタイプ（例: {@code ClassStereotype.INTERFACE}）
+ * <p>同一性は packageName + simpleName + stereotype で決まる。
+ * groupIndex はレイアウト用メタデータであり同一性に含まれない。
  */
-public record ClassInfo(String packageName, String simpleName, ClassStereotype stereotype) {
+public final class ClassInfo {
+
+    private final String packageName;
+    private final String simpleName;
+    private final ClassStereotype stereotype;
+    private int groupIndex;
 
     /**
-     * コンポーネントnullチェックを行うコンパクトコンストラクタ。
+     * ClassInfoを生成する。
      *
+     * @param packageName パッケージ名
+     * @param simpleName  単純名
+     * @param stereotype  ステレオタイプ
      * @throws NullPointerException packageName、simpleName、またはstereotypeがnullの場合
      */
-    public ClassInfo {
-        Objects.requireNonNull(packageName, "packageName must not be null");
-        Objects.requireNonNull(simpleName, "simpleName must not be null");
-        Objects.requireNonNull(stereotype, "stereotype must not be null");
+    public ClassInfo(String packageName, String simpleName, ClassStereotype stereotype) {
+        this.packageName = Objects.requireNonNull(packageName, "packageName must not be null");
+        this.simpleName = Objects.requireNonNull(simpleName, "simpleName must not be null");
+        this.stereotype = Objects.requireNonNull(stereotype, "stereotype must not be null");
+        this.groupIndex = 0;
     }
 
     /**
@@ -32,6 +40,27 @@ public record ClassInfo(String packageName, String simpleName, ClassStereotype s
      */
     public ClassInfo(String packageName, String simpleName) {
         this(packageName, simpleName, ClassStereotype.NONE);
+    }
+
+    /** @return パッケージ名 */
+    public String packageName() { return packageName; }
+
+    /** @return 単純名 */
+    public String simpleName() { return simpleName; }
+
+    /** @return ステレオタイプ */
+    public ClassStereotype stereotype() { return stereotype; }
+
+    /** @return グループインデックス（デフォルト0） */
+    public int groupIndex() { return groupIndex; }
+
+    /**
+     * グループインデックスを設定する。{@link ConnectedComponentSplitter} が呼び出す。
+     *
+     * @param groupIndex グループインデックス（0以上）
+     */
+    public void setGroupIndex(int groupIndex) {
+        this.groupIndex = groupIndex;
     }
 
     /**
@@ -64,5 +93,24 @@ public record ClassInfo(String packageName, String simpleName, ClassStereotype s
                 "fqn must be a fully qualified name containing at least one '.': " + fqn);
         }
         return new ClassInfo(fqn.substring(0, dot), fqn.substring(dot + 1), stereotype);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ClassInfo other)) return false;
+        return packageName.equals(other.packageName)
+            && simpleName.equals(other.simpleName)
+            && stereotype == other.stereotype;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(packageName, simpleName, stereotype);
+    }
+
+    @Override
+    public String toString() {
+        return packageName + "." + simpleName + "[" + stereotype + ",g=" + groupIndex + "]";
     }
 }

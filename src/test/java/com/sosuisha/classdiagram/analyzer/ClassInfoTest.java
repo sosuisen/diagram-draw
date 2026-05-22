@@ -72,4 +72,33 @@ class ClassInfoTest {
         assertThrows(NullPointerException.class,
             () -> new ClassInfo("com.example", "Foo", null));
     }
+
+    @Test
+    void groupIndexDefaultsToZero() {
+        var info = new ClassInfo("com.example", "Foo");
+        assertEquals(0, info.groupIndex());
+    }
+
+    @Test
+    void setGroupIndexUpdatesValue() {
+        var info = new ClassInfo("com.example", "Foo");
+        info.setGroupIndex(2);
+        assertEquals(2, info.groupIndex());
+    }
+
+    @Test
+    void equalsIgnoresGroupIndex() {
+        var a = new ClassInfo("com.example", "Foo");
+        var b = new ClassInfo("com.example", "Foo");
+        b.setGroupIndex(99);
+        assertEquals(a, b);
+    }
+
+    @Test
+    void hashCodeIgnoresGroupIndex() {
+        var a = new ClassInfo("com.example", "Foo");
+        var b = new ClassInfo("com.example", "Foo");
+        b.setGroupIndex(99);
+        assertEquals(a.hashCode(), b.hashCode());
+    }
 }

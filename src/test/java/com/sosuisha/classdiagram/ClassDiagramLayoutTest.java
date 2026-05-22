@@ -23,13 +23,13 @@ class ClassDiagramLayoutTest {
     @Test
     void layoutThrowsForNullLayers() {
         assertThrows(NullPointerException.class,
-            () -> new ClassDiagramLayout(20, 40, 20, 20).layout(null, List.of()));
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60).layout(null, List.of()));
     }
 
     @Test
     void layoutThrowsForNullRelations() {
         assertThrows(NullPointerException.class,
-            () -> new ClassDiagramLayout(20, 40, 20, 20).layout(List.of(), null));
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60).layout(List.of(), null));
     }
 
     @Test
@@ -40,7 +40,7 @@ class ClassDiagramLayoutTest {
         var a = ci("A"); var b = ci("B"); var c = ci("C"); var d = ci("D");
         var rels = List.of(rel(a, b), rel(b, d), rel(a, c));
         var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
 
         var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
         var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
@@ -59,7 +59,7 @@ class ClassDiagramLayoutTest {
         var a = ci("A"); var b = ci("B");
         var rels = List.of(rel(a, b));
         var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
 
         var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
         assertEquals(20, boxA.y()); // canvasPaddingY = 20
@@ -73,7 +73,7 @@ class ClassDiagramLayoutTest {
         var a = ci("A"); var b = ci("B"); var c = ci("C");
         var rels = List.of(rel(a, b), rel(a, c));
         var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
 
         int canvasWidth = result.canvasWidth();
         var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
@@ -90,7 +90,7 @@ class ClassDiagramLayoutTest {
         var rels = List.of(rel(a, b));
         var layers = new ClassRelationSorter().sort(rels);
         int padding = 20;
-        var result = new ClassDiagramLayout(20, 40, padding, padding).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, padding, padding, 60).layout(layers, rels);
 
         assertTrue(result.canvasWidth() >= 2 * padding);
         assertTrue(result.canvasHeight() >= 2 * padding);
@@ -101,7 +101,7 @@ class ClassDiagramLayoutTest {
         var a = ci("A"); var b = ci("B");
         var rels = List.of(rel(a, b));
         var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
 
         assertEquals(1, result.dependencies().size());
         assertEquals(DependencyType.COMPOSITION, result.dependencies().get(0).type());
@@ -113,7 +113,7 @@ class ClassDiagramLayoutTest {
         var impl = ci("FooImpl");
         var rel = new ClassRelation(impl, iface, DependencyType.REALIZATION, false);
         var layers = new ClassRelationSorter().sort(List.of(rel));
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, List.of(rel));
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, List.of(rel));
 
         var ifaceBox = result.boxes().stream()
             .filter(b -> b.name().equals("IFoo")).findFirst().orElseThrow();
@@ -137,7 +137,7 @@ class ClassDiagramLayoutTest {
             new ClassRelation(implA, leaf, DependencyType.COMPOSITION, false)
         );
         var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
 
         var boxImplA = result.boxes().stream().filter(b -> b.name().equals("FooImplA")).findFirst().orElseThrow();
         var boxImplB = result.boxes().stream().filter(b -> b.name().equals("FooImplB")).findFirst().orElseThrow();
@@ -151,7 +151,7 @@ class ClassDiagramLayoutTest {
         var impl = new ClassInfo(PKG, "FooImpl"); // NONE
         var rel = new ClassRelation(impl, iface, DependencyType.REALIZATION, false);
         var layers = new ClassRelationSorter().sort(List.of(rel));
-        var result = new ClassDiagramLayout(20, 40, 20, 20).layout(layers, List.of(rel));
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, List.of(rel));
 
         var ifaceBox = result.boxes().stream()
             .filter(b -> b.name().equals("IFoo")).findFirst().orElseThrow();
@@ -159,5 +159,47 @@ class ClassDiagramLayoutTest {
             .filter(b -> b.name().equals("FooImpl")).findFirst().orElseThrow();
         assertEquals(ClassStereotype.INTERFACE, ifaceBox.stereotype());
         assertEquals(ClassStereotype.NONE, implBox.stereotype());
+    }
+
+    @Test
+    void layoutArrangesTwoGroupsHorizontally() {
+        var a = ci("A"); var b = ci("B");   // group 0 (default)
+        var x = ci("X"); var y = ci("Y");   // group 1
+        x.setGroupIndex(1); y.setGroupIndex(1);
+
+        var rels = List.of(rel(a, b), rel(x, y));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxX = result.boxes().stream().filter(bx -> bx.name().equals("X")).findFirst().orElseThrow();
+        assertTrue(boxX.x() > boxA.x() + boxA.width(),
+            "Group 1 must start to the right of group 0");
+    }
+
+    @Test
+    void layoutCanvasWidthGrowsWithLargerGroupGap() {
+        var a = ci("A"); var b = ci("B");
+        var x = ci("X"); var y = ci("Y");
+        x.setGroupIndex(1); y.setGroupIndex(1);
+
+        var rels = List.of(rel(a, b), rel(x, y));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result60  = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+        var result120 = new ClassDiagramLayout(20, 40, 20, 20, 120).layout(layers, rels);
+        assertTrue(result120.canvasWidth() > result60.canvasWidth(),
+            "Larger groupGap must produce wider canvas");
+    }
+
+    @Test
+    void layoutSingleGroupBehaviorUnchangedWithGroupGap() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // groupGap is unused when there is only 1 group
+        var result0   = new ClassDiagramLayout(20, 40, 20, 20, 0).layout(layers, rels);
+        var result100 = new ClassDiagramLayout(20, 40, 20, 20, 100).layout(layers, rels);
+        assertEquals(result0.canvasWidth(),  result100.canvasWidth());
+        assertEquals(result0.canvasHeight(), result100.canvasHeight());
     }
 }

@@ -101,4 +101,10 @@ class ClassInfoTest {
         b.setGroupIndex(99);
         assertEquals(a.hashCode(), b.hashCode());
     }
+
+    @Test
+    void setGroupIndexThrowsForNegativeValue() {
+        var info = new ClassInfo("com.example", "Foo");
+        assertThrows(IllegalArgumentException.class, () -> info.setGroupIndex(-1));
+    }
 }

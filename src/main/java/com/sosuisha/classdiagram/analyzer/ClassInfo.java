@@ -28,7 +28,6 @@ public final class ClassInfo {
         this.packageName = Objects.requireNonNull(packageName, "packageName must not be null");
         this.simpleName = Objects.requireNonNull(simpleName, "simpleName must not be null");
         this.stereotype = Objects.requireNonNull(stereotype, "stereotype must not be null");
-        this.groupIndex = 0;
     }
 
     /**
@@ -58,8 +57,12 @@ public final class ClassInfo {
      * グループインデックスを設定する。{@link ConnectedComponentSplitter} が呼び出す。
      *
      * @param groupIndex グループインデックス（0以上）
+     * @throws IllegalArgumentException groupIndexが0未満の場合
      */
     public void setGroupIndex(int groupIndex) {
+        if (groupIndex < 0) {
+            throw new IllegalArgumentException("groupIndex must be >= 0: " + groupIndex);
+        }
         this.groupIndex = groupIndex;
     }
 

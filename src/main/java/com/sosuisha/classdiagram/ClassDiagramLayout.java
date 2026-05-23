@@ -229,6 +229,13 @@ public class ClassDiagramLayout {
             }
         }
 
+        Map<ClassInfo, ClassInfo> ifaceOfImpl = new HashMap<>();
+        for (var rel : relations) {
+            if (rel.type() == DependencyType.REALIZATION) {
+                ifaceOfImpl.put(rel.sourceClassInfo(), rel.targetClassInfo());
+            }
+        }
+
         var result = new ArrayList<List<ClassInfo>>();
         for (var layer : layers) {
             result.add(new ArrayList<>(layer));
@@ -238,11 +245,11 @@ public class ClassDiagramLayout {
             boolean changed = false;
             if (pass % 2 == 0) {
                 for (int i = 0; i + 1 < result.size(); i++) {
-                    changed |= sortLayerByBarycenter(result.get(i + 1), result.get(i), upNeighbors);
+                    changed |= sortLayerByBarycenter(result.get(i + 1), result.get(i), upNeighbors, ifaceOfImpl);
                 }
             } else {
                 for (int i = result.size() - 2; i >= 0; i--) {
-                    changed |= sortLayerByBarycenter(result.get(i), result.get(i + 1), downNeighbors);
+                    changed |= sortLayerByBarycenter(result.get(i), result.get(i + 1), downNeighbors, ifaceOfImpl);
                 }
             }
             if (!changed) break;
@@ -253,7 +260,8 @@ public class ClassDiagramLayout {
 
     private boolean sortLayerByBarycenter(
             List<ClassInfo> layer, List<ClassInfo> referenceLayer,
-            Map<ClassInfo, List<ClassInfo>> adj) {
+            Map<ClassInfo, List<ClassInfo>> adj,
+            Map<ClassInfo, ClassInfo> ifaceOfImpl) {
         Map<ClassInfo, Integer> pos = new HashMap<>();
         for (int i = 0; i < referenceLayer.size(); i++) {
             pos.put(referenceLayer.get(i), i);
@@ -275,8 +283,33 @@ public class ClassDiagramLayout {
             bary.put(node, count > 0 ? sum / count : (double) i);
         }
 
-        var sorted = new ArrayList<>(layer);
-        sorted.sort(Comparator.comparingDouble(bary::get)); // stable sort: equal barycenters preserve original order
+        // Group nodes by their group key: ifaceOfImpl(node) or the node itself.
+        // Co-implementors of the same interface share a group key -> become a contiguous block.
+        Map<ClassInfo, List<ClassInfo>> groups = new LinkedHashMap<>();
+        for (var node : layer) {
+            var key = ifaceOfImpl.getOrDefault(node, node);
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(node);
+        }
+
+        // Group barycenter = mean of individual barycenters in the group.
+        Map<ClassInfo, Double> groupBary = new HashMap<>();
+        for (var entry : groups.entrySet()) {
+            double sum = 0;
+            for (var n : entry.getValue()) sum += bary.get(n);
+            groupBary.put(entry.getKey(), sum / entry.getValue().size());
+        }
+
+        // Stable sort groups by group barycenter; within each group, stable sort by individual barycenter.
+        var sortedGroups = new ArrayList<>(groups.entrySet());
+        sortedGroups.sort((e1, e2) -> Double.compare(
+            groupBary.get(e1.getKey()), groupBary.get(e2.getKey())));
+
+        var sorted = new ArrayList<ClassInfo>();
+        for (var entry : sortedGroups) {
+            var members = new ArrayList<>(entry.getValue());
+            members.sort(Comparator.comparingDouble(bary::get));
+            sorted.addAll(members);
+        }
 
         if (!sorted.equals(layer)) {
             layer.clear();

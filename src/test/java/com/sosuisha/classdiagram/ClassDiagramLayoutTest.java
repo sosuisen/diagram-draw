@@ -361,4 +361,39 @@ class ClassDiagramLayoutTest {
         assertTrue(boxImplA.x() < boxImplB.x(),
             "ImplA (parent=IA at idx 0) must be left of ImplB (parent=IB at idx 1)");
     }
+
+    @Test
+    void coImplementorsStayAdjacentWhenSameBarycenter() {
+        // Layer 0: [A, IFoo, B]  A at 0, IFoo at 1, B at 2
+        // Layer 1: [ImplFoo1, X, ImplFoo2]
+        //   ImplFoo1 → IFoo (REALIZATION)         bary = 1
+        //   COMP(A, X) and COMP(B, X)             bary(X) = (0+2)/2 = 1
+        //   ImplFoo2 → IFoo (REALIZATION)         bary = 1
+        // Without grouping: all bary = 1, stable sort keeps initial order
+        //   → [ImplFoo1, X, ImplFoo2]  (co-implementors NOT adjacent)
+        // With grouping: IFoo-group [ImplFoo1, ImplFoo2] and X-group [X]
+        //   → [ImplFoo1, ImplFoo2, X]  (co-implementors adjacent)
+        var a = ci("A"); var b = ci("B"); var x = ci("X");
+        var iFoo = new ClassInfo(PKG, "IFoo", ClassStereotype.INTERFACE);
+        var implFoo1 = ci("ImplFoo1"); var implFoo2 = ci("ImplFoo2");
+
+        var layers = List.of(List.of(a, iFoo, b), List.of(implFoo1, x, implFoo2));
+        var rels = List.of(
+            new ClassRelation(implFoo1, iFoo, DependencyType.REALIZATION, false),
+            new ClassRelation(implFoo2, iFoo, DependencyType.REALIZATION, false),
+            new ClassRelation(a, x, DependencyType.COMPOSITION, false),
+            new ClassRelation(b, x, DependencyType.COMPOSITION, false)
+        );
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        var box1 = result.boxes().stream().filter(bx -> bx.name().equals("ImplFoo1")).findFirst().orElseThrow();
+        var box2 = result.boxes().stream().filter(bx -> bx.name().equals("ImplFoo2")).findFirst().orElseThrow();
+
+        // ImplFoo1 and ImplFoo2 have identical name length → identical widths.
+        // Adjacent ⇔ |x1 - x2| == width + horizontalGap(=20).
+        int dist = Math.abs(box1.x() - box2.x());
+        int adjacentDist = box1.width() + 20;
+        assertEquals(adjacentDist, dist,
+            "ImplFoo1 and ImplFoo2 (co-implementors of IFoo) must be adjacent in the same layer");
+    }
 }

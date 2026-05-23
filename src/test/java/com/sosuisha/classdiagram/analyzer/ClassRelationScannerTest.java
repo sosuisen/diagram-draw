@@ -176,4 +176,17 @@ class ClassRelationScannerTest {
         assertFalse(src.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepSource"),
             "A class must not depend on itself");
     }
+
+    @Test
+    void scanDetectsDependencyFqnForInterfaceAbstractMethodParam() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXDEP_PKG);
+        var ifaceInfo = relations.stream()
+            .filter(r -> r.type() == DependencyType.REALIZATION
+                      && r.targetClassInfo().simpleName().equals("FixtureDepInterface"))
+            .map(ClassRelation::targetClassInfo)
+            .findFirst()
+            .orElseThrow();
+        assertTrue(ifaceInfo.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepTarget"),
+            "FixtureDepInterface.handle(FixtureDepTarget) must add FixtureDepTarget to dependencyTargetFqns");
+    }
 }

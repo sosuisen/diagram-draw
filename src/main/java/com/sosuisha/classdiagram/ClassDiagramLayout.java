@@ -4,10 +4,12 @@ import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -173,11 +175,13 @@ public class ClassDiagramLayout {
         for (var info : boxMap.keySet()) {
             fqnToInfo.put(info.packageName() + "." + info.simpleName(), info);
         }
+        var implToIfaceInfos = buildImplToIfaceInfosMap(relations, fqnToInfo);
         for (var srcInfo : boxMap.keySet()) {
             for (var fqn : srcInfo.dependencyTargetFqns()) {
                 var tgtInfo = fqnToInfo.get(fqn);
                 if (tgtInfo == null) continue;
                 if (srcInfo.groupIndex() == tgtInfo.groupIndex()) continue;
+                if (isCoveredByInterface(fqn, srcInfo, implToIfaceInfos)) continue;
                 var src = boxMap.get(srcInfo);
                 var tgt = boxMap.get(tgtInfo);
                 if (src != null && tgt != null) {
@@ -192,5 +196,31 @@ public class ClassDiagramLayout {
             canvasWidth,
             canvasHeight
         );
+    }
+
+    private static Map<ClassInfo, Set<ClassInfo>> buildImplToIfaceInfosMap(
+            List<ClassRelation> relations, Map<String, ClassInfo> fqnToInfo) {
+        var map = new HashMap<ClassInfo, Set<ClassInfo>>();
+        for (var rel : relations) {
+            if (rel.type() != DependencyType.REALIZATION) {
+                continue;
+            }
+            var ifaceFqn = rel.targetClassInfo().packageName() + "." + rel.targetClassInfo().simpleName();
+            var ifaceInfo = fqnToInfo.get(ifaceFqn);
+            if (ifaceInfo == null) {
+                continue;
+            }
+            map.computeIfAbsent(rel.sourceClassInfo(), k -> new HashSet<>()).add(ifaceInfo);
+        }
+        return map;
+    }
+
+    private static boolean isCoveredByInterface(String targetFqn, ClassInfo srcInfo,
+            Map<ClassInfo, Set<ClassInfo>> implToIfaceInfos) {
+        var ifaceInfos = implToIfaceInfos.get(srcInfo);
+        if (ifaceInfos == null) {
+            return false;
+        }
+        return ifaceInfos.stream().anyMatch(iface -> iface.dependencyTargetFqns().contains(targetFqn));
     }
 }

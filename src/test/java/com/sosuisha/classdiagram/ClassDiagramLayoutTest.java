@@ -5,6 +5,7 @@ import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import com.sosuisha.classdiagram.analyzer.ClassRelationSorter;
 import com.sosuisha.classdiagram.ClassStereotype;
 import org.junit.jupiter.api.Test;
+import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -234,6 +235,55 @@ class ClassDiagramLayoutTest {
 
         assertTrue(result.dependencies().stream().noneMatch(d -> d.type() == DependencyType.DEPENDENCY),
             "Same-group FQN must not produce a DEPENDENCY arrow");
+    }
+
+    @Test
+    void layoutSuppressesImplementerDependencyArrowWhenInterfaceHasSame() {
+        var iface = new ClassInfo(PKG, "IFoo", ClassStereotype.INTERFACE);
+        var impl = new ClassInfo(PKG, "FooImpl");
+        var target = ci("Target");
+        target.setGroupIndex(1);
+
+        // Both interface and impl declare dependency on Target (cross-group)
+        iface.addDependencyTargetFqn(PKG + ".Target");
+        impl.addDependencyTargetFqn(PKG + ".Target");
+
+        var rels = List.of(new ClassRelation(impl, iface, DependencyType.REALIZATION, false));
+        var layers = new ArrayList<>(new ClassRelationSorter().sort(rels));
+        layers.add(List.of(target));
+
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        assertTrue(result.dependencies().stream().anyMatch(d ->
+            d.source().name().equals("IFoo") && d.target().name().equals("Target")
+            && d.type() == DependencyType.DEPENDENCY),
+            "IFoo → Target DEPENDENCY arrow must be drawn");
+        assertFalse(result.dependencies().stream().anyMatch(d ->
+            d.source().name().equals("FooImpl") && d.target().name().equals("Target")
+            && d.type() == DependencyType.DEPENDENCY),
+            "FooImpl → Target must be suppressed because IFoo already has the same DEPENDENCY");
+    }
+
+    @Test
+    void layoutKeepsImplementerDependencyArrowWhenInterfaceLacksIt() {
+        var iface = new ClassInfo(PKG, "IFoo", ClassStereotype.INTERFACE);
+        var impl = new ClassInfo(PKG, "FooImpl");
+        var target = ci("Target");
+        target.setGroupIndex(1);
+
+        // Only impl depends on Target; interface does NOT
+        impl.addDependencyTargetFqn(PKG + ".Target");
+
+        var rels = List.of(new ClassRelation(impl, iface, DependencyType.REALIZATION, false));
+        var layers = new ArrayList<>(new ClassRelationSorter().sort(rels));
+        layers.add(List.of(target));
+
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        assertTrue(result.dependencies().stream().anyMatch(d ->
+            d.source().name().equals("FooImpl") && d.target().name().equals("Target")
+            && d.type() == DependencyType.DEPENDENCY),
+            "FooImpl → Target must be kept when IFoo does not have the same DEPENDENCY");
     }
 
     @Test

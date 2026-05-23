@@ -58,6 +58,7 @@ public class ClassRelationScanner {
 
     private List<ClassRelation> analyzeRelations(Path classRoot, Set<String> targetClassNames) {
         var stereotypes = collectStereotypes(classRoot, targetClassNames);
+        var classInfoCache = buildClassInfoCache(targetClassNames, stereotypes);
         var relations = new ArrayList<ClassRelation>();
 
         for (var className : targetClassNames) {
@@ -69,8 +70,7 @@ public class ClassRelationScanner {
                 continue;
             }
 
-            var sourceInfo = ClassInfo.fromFullyQualifiedName(className,
-                stereotypes.getOrDefault(className, ClassStereotype.NONE));
+            var sourceInfo = classInfoCache.get(className);
             var constructorParamTypeNames = collectConstructorParamTypeNames(model);
 
             var fieldFqns = new HashSet<String>();
@@ -79,8 +79,7 @@ public class ClassRelationScanner {
                 if (resolved == null) continue;
                 fieldFqns.add(resolved.targetClassName());
 
-                var targetInfo = ClassInfo.fromFullyQualifiedName(resolved.targetClassName(),
-                    stereotypes.getOrDefault(resolved.targetClassName(), ClassStereotype.NONE));
+                var targetInfo = classInfoCache.get(resolved.targetClassName());
                 var type = constructorParamTypeNames.contains(resolved.targetClassName())
                     ? DependencyType.AGGREGATION
                     : DependencyType.COMPOSITION;
@@ -94,11 +93,9 @@ public class ClassRelationScanner {
             for (var iface : model.interfaces()) {
                 var ifaceName = internalNameToBinary(iface.asInternalName());
                 if (targetClassNames.contains(ifaceName)) {
-                    var ifaceInfo = ClassInfo.fromFullyQualifiedName(ifaceName,
-                        stereotypes.getOrDefault(ifaceName, ClassStereotype.NONE));
                     relations.add(new ClassRelation(
                         sourceInfo,
-                        ifaceInfo,
+                        classInfoCache.get(ifaceName),
                         DependencyType.REALIZATION,
                         false
                     ));
@@ -107,6 +104,16 @@ public class ClassRelationScanner {
         }
 
         return List.copyOf(relations);
+    }
+
+    private static Map<String, ClassInfo> buildClassInfoCache(Set<String> targetClassNames,
+                                                               Map<String, ClassStereotype> stereotypes) {
+        var cache = new HashMap<String, ClassInfo>();
+        for (var className : targetClassNames) {
+            cache.put(className, ClassInfo.fromFullyQualifiedName(className,
+                stereotypes.getOrDefault(className, ClassStereotype.NONE)));
+        }
+        return cache;
     }
 
     private Map<String, ClassStereotype> collectStereotypes(Path classRoot, Set<String> targetClassNames) {

@@ -299,4 +299,66 @@ class ClassDiagramLayoutTest {
         assertTrue(result.dependencies().stream().noneMatch(d -> d.type() == DependencyType.DEPENDENCY),
             "Unresolvable FQN must be silently ignored");
     }
+
+    @Test
+    void minimizeCrossingsReducesCrossings() {
+        // Layer 0: [A, B]  A at index 0, B at index 1
+        // Layer 1: [C, D]  A→D and B→C → crossing before minimization
+        // After minimization: bary(D)=0 (parent A at 0), bary(C)=1 (parent B at 1)
+        // → D must be left of C
+        var a = ci("A"); var b = ci("B"); var c = ci("C"); var d = ci("D");
+        var layers = List.of(List.of(a, b), List.of(c, d));
+        var rels = List.of(
+            new ClassRelation(a, d, DependencyType.COMPOSITION, false),
+            new ClassRelation(b, c, DependencyType.COMPOSITION, false)
+        );
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
+        var boxD = result.boxes().stream().filter(bx -> bx.name().equals("D")).findFirst().orElseThrow();
+        assertTrue(boxD.x() < boxC.x(),
+            "D (parent=A at idx 0) must be left of C (parent=B at idx 1) after crossing minimization");
+    }
+
+    @Test
+    void minimizeCrossingsNoNeighborNodeKeepsRelativeOrder() {
+        // Layer 0: [B, A]  B at index 0, A at index 1
+        // Layer 1: [C, D, E]  COMP(A,C) → bary(C)=1, COMP(B,D) → bary(D)=0, E has no parent → bary(E)=2 (current idx)
+        // After minimization: [D, C, E]
+        var a = ci("A"); var b = ci("B"); var c = ci("C"); var d = ci("D"); var e = ci("E");
+        var layers = List.of(List.of(b, a), List.of(c, d, e));
+        var rels = List.of(
+            new ClassRelation(a, c, DependencyType.COMPOSITION, false),
+            new ClassRelation(b, d, DependencyType.COMPOSITION, false)
+        );
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
+        var boxD = result.boxes().stream().filter(bx -> bx.name().equals("D")).findFirst().orElseThrow();
+        var boxE = result.boxes().stream().filter(bx -> bx.name().equals("E")).findFirst().orElseThrow();
+        assertTrue(boxD.x() < boxC.x(), "D (bary=0) must be left of C (bary=1)");
+        assertTrue(boxC.x() < boxE.x(), "E (no neighbor, bary=current idx=2) must be rightmost");
+    }
+
+    @Test
+    void minimizeCrossingsRealizationReducesCrossings() {
+        // Layer 0: [IA, IB]  IA at index 0, IB at index 1 (interfaces)
+        // Layer 1: [ImplB, ImplA]  ImplA implements IA, ImplB implements IB → crossing!
+        // After minimization: bary(ImplA)=0, bary(ImplB)=1 → [ImplA, ImplB]
+        var ia = new ClassInfo(PKG, "IA", ClassStereotype.INTERFACE);
+        var ib = new ClassInfo(PKG, "IB", ClassStereotype.INTERFACE);
+        var implA = ci("ImplA");
+        var implB = ci("ImplB");
+        var layers = List.of(List.of(ia, ib), List.of(implB, implA));
+        var rels = List.of(
+            new ClassRelation(implA, ia, DependencyType.REALIZATION, false),
+            new ClassRelation(implB, ib, DependencyType.REALIZATION, false)
+        );
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
+
+        var boxImplA = result.boxes().stream().filter(bx -> bx.name().equals("ImplA")).findFirst().orElseThrow();
+        var boxImplB = result.boxes().stream().filter(bx -> bx.name().equals("ImplB")).findFirst().orElseThrow();
+        assertTrue(boxImplA.x() < boxImplB.x(),
+            "ImplA (parent=IA at idx 0) must be left of ImplB (parent=IB at idx 1)");
+    }
 }

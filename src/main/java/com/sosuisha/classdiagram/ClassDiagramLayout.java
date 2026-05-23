@@ -22,13 +22,13 @@ import java.util.stream.Collectors;
  */
 public class ClassDiagramLayout {
 
+    private static final int MAX_CROSSING_PASSES = 12;
+
     private final int horizontalGap;
     private final int verticalGap;
     private final int canvasPaddingX;
     private final int canvasPaddingY;
     private final int groupGap;
-
-    private static final int MAX_CROSSING_PASSES = 12;
 
     /**
      * ClassDiagramLayoutを生成する。
@@ -208,19 +208,19 @@ public class ClassDiagramLayout {
             List<List<ClassInfo>> layers, List<ClassRelation> relations) {
         if (layers.size() <= 1) return layers;
 
-        Map<ClassInfo, List<ClassInfo>> parents = new HashMap<>();
-        Map<ClassInfo, List<ClassInfo>> children = new HashMap<>();
+        Map<ClassInfo, List<ClassInfo>> upNeighbors = new HashMap<>();
+        Map<ClassInfo, List<ClassInfo>> downNeighbors = new HashMap<>();
         for (var rel : relations) {
             if (rel.type() == DependencyType.REALIZATION) {
-                parents.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
+                upNeighbors.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
                        .add(rel.targetClassInfo());
-                children.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
+                downNeighbors.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
                         .add(rel.sourceClassInfo());
             } else if (rel.type() == DependencyType.COMPOSITION
                     || rel.type() == DependencyType.AGGREGATION) {
-                parents.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
+                upNeighbors.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
                        .add(rel.sourceClassInfo());
-                children.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
+                downNeighbors.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
                         .add(rel.targetClassInfo());
             }
         }
@@ -234,11 +234,11 @@ public class ClassDiagramLayout {
             boolean changed = false;
             if (pass % 2 == 0) {
                 for (int i = 0; i + 1 < result.size(); i++) {
-                    changed |= sortLayerByBarycenter(result.get(i + 1), result.get(i), parents);
+                    changed |= sortLayerByBarycenter(result.get(i + 1), result.get(i), upNeighbors);
                 }
             } else {
                 for (int i = result.size() - 2; i >= 0; i--) {
-                    changed |= sortLayerByBarycenter(result.get(i), result.get(i + 1), children);
+                    changed |= sortLayerByBarycenter(result.get(i), result.get(i + 1), downNeighbors);
                 }
             }
             if (!changed) break;

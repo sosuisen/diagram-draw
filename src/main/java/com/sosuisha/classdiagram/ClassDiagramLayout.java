@@ -206,7 +206,11 @@ public class ClassDiagramLayout {
 
     private List<List<ClassInfo>> minimizeCrossings(
             List<List<ClassInfo>> layers, List<ClassRelation> relations) {
-        if (layers.size() <= 1) return layers;
+        if (layers.size() <= 1) {
+            var copy = new ArrayList<List<ClassInfo>>();
+            for (var layer : layers) copy.add(new ArrayList<>(layer));
+            return copy;
+        }
 
         Map<ClassInfo, List<ClassInfo>> upNeighbors = new HashMap<>();
         Map<ClassInfo, List<ClassInfo>> downNeighbors = new HashMap<>();
@@ -272,7 +276,7 @@ public class ClassDiagramLayout {
         }
 
         var sorted = new ArrayList<>(layer);
-        sorted.sort(Comparator.comparingDouble(bary::get));
+        sorted.sort(Comparator.comparingDouble(bary::get)); // stable sort: equal barycenters preserve original order
 
         if (!sorted.equals(layer)) {
             layer.clear();

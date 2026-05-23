@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,6 +27,8 @@ public class ClassDiagramLayout {
     private final int canvasPaddingX;
     private final int canvasPaddingY;
     private final int groupGap;
+
+    private static final int MAX_CROSSING_PASSES = 12;
 
     /**
      * ClassDiagramLayoutを生成する。
@@ -69,8 +72,11 @@ public class ClassDiagramLayout {
             }
         }
 
+        // 辺交差の最小化（重心法）
+        var orderedLayers = minimizeCrossings(layers, relations);
+
         // Step 2: groupIndex ごとにサブレイヤーを構築（空レイヤーは除去）
-        var groupIndices = layers.stream()
+        var groupIndices = orderedLayers.stream()
             .flatMap(List::stream)
             .mapToInt(ClassInfo::groupIndex)
             .distinct()
@@ -81,7 +87,7 @@ public class ClassDiagramLayout {
         var groupSubLayers = new ArrayList<List<List<ClassInfo>>>(numGroups);
         for (int gi : groupIndices) {
             var subLayers = new ArrayList<List<ClassInfo>>();
-            for (var layer : layers) {
+            for (var layer : orderedLayers) {
                 var filtered = layer.stream()
                     .filter(info -> info.groupIndex() == gi)
                     .collect(Collectors.toCollection(ArrayList::new));
@@ -196,6 +202,84 @@ public class ClassDiagramLayout {
             canvasWidth,
             canvasHeight
         );
+    }
+
+    private List<List<ClassInfo>> minimizeCrossings(
+            List<List<ClassInfo>> layers, List<ClassRelation> relations) {
+        if (layers.size() <= 1) return layers;
+
+        Map<ClassInfo, List<ClassInfo>> parents = new HashMap<>();
+        Map<ClassInfo, List<ClassInfo>> children = new HashMap<>();
+        for (var rel : relations) {
+            if (rel.type() == DependencyType.REALIZATION) {
+                parents.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
+                       .add(rel.targetClassInfo());
+                children.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
+                        .add(rel.sourceClassInfo());
+            } else if (rel.type() == DependencyType.COMPOSITION
+                    || rel.type() == DependencyType.AGGREGATION) {
+                parents.computeIfAbsent(rel.targetClassInfo(), k -> new ArrayList<>())
+                       .add(rel.sourceClassInfo());
+                children.computeIfAbsent(rel.sourceClassInfo(), k -> new ArrayList<>())
+                        .add(rel.targetClassInfo());
+            }
+        }
+
+        var result = new ArrayList<List<ClassInfo>>();
+        for (var layer : layers) {
+            result.add(new ArrayList<>(layer));
+        }
+
+        for (int pass = 0; pass < MAX_CROSSING_PASSES; pass++) {
+            boolean changed = false;
+            if (pass % 2 == 0) {
+                for (int i = 0; i + 1 < result.size(); i++) {
+                    changed |= sortLayerByBarycenter(result.get(i + 1), result.get(i), parents);
+                }
+            } else {
+                for (int i = result.size() - 2; i >= 0; i--) {
+                    changed |= sortLayerByBarycenter(result.get(i), result.get(i + 1), children);
+                }
+            }
+            if (!changed) break;
+        }
+
+        return result;
+    }
+
+    private boolean sortLayerByBarycenter(
+            List<ClassInfo> layer, List<ClassInfo> referenceLayer,
+            Map<ClassInfo, List<ClassInfo>> adj) {
+        Map<ClassInfo, Integer> pos = new HashMap<>();
+        for (int i = 0; i < referenceLayer.size(); i++) {
+            pos.put(referenceLayer.get(i), i);
+        }
+
+        Map<ClassInfo, Double> bary = new HashMap<>();
+        for (int i = 0; i < layer.size(); i++) {
+            var node = layer.get(i);
+            var neighbors = adj.getOrDefault(node, List.of());
+            double sum = 0;
+            int count = 0;
+            for (var neighbor : neighbors) {
+                var p = pos.get(neighbor);
+                if (p != null) {
+                    sum += p;
+                    count++;
+                }
+            }
+            bary.put(node, count > 0 ? sum / count : (double) i);
+        }
+
+        var sorted = new ArrayList<>(layer);
+        sorted.sort(Comparator.comparingDouble(bary::get));
+
+        if (!sorted.equals(layer)) {
+            layer.clear();
+            layer.addAll(sorted);
+            return true;
+        }
+        return false;
     }
 
     private static Map<ClassInfo, Set<ClassInfo>> buildImplToIfaceInfosMap(

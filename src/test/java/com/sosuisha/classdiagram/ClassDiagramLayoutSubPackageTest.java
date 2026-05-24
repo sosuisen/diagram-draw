@@ -83,7 +83,7 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
-    void rootPackageSlotIsPlacedLeftOfSubPackageSlots() {
+    void rootPackageSlotIsPlacedAboveSubPackageSlots() {
         // R (root) ← S (com.example.service). One connected component (REALIZATION).
         var rRoot = ci(ROOT, "R");
         var sSvc  = ci(ROOT + ".service", "S");
@@ -96,12 +96,12 @@ class ClassDiagramLayoutSubPackageTest {
 
         var boxR = result.boxes().stream().filter(b -> b.name().equals("R")).findFirst().orElseThrow();
         var boxS = result.boxes().stream().filter(b -> b.name().equals("S")).findFirst().orElseThrow();
-        assertTrue(boxR.x() < boxS.x(), "root-package class must be left of sub-package class");
+        assertTrue(boxR.y() < boxS.y(), "root-package class must be above sub-package class");
 
         assertEquals(1, result.packageGroups().size());
         assertEquals("service", result.packageGroups().get(0).label());
         var pg = result.packageGroups().get(0);
-        assertTrue(boxR.x() + boxR.width() <= pg.x(), "R is left of and outside the service group");
+        assertTrue(boxR.y() + boxR.height() <= pg.y(), "R is above and outside the service group");
     }
 
     @Test
@@ -147,9 +147,9 @@ class ClassDiagramLayoutSubPackageTest {
         assertTrue(boxA.y() >= serviceGroup.y() && boxA.y() + boxA.height() <= serviceGroup.y() + serviceGroup.height());
         assertTrue(boxB.y() >= serviceGroup.y() && boxB.y() + boxB.height() <= serviceGroup.y() + serviceGroup.height());
 
-        boolean mIsOutsideHorizontally =
-            (boxM.x() + boxM.width() <= serviceGroup.x()) || (boxM.x() >= serviceGroup.x() + serviceGroup.width());
-        assertTrue(mIsOutsideHorizontally, "M must be horizontally outside the service group rectangle");
+        boolean mIsOutsideVertically =
+            (boxM.y() + boxM.height() <= serviceGroup.y()) || (boxM.y() >= serviceGroup.y() + serviceGroup.height());
+        assertTrue(mIsOutsideVertically, "M must be vertically outside the service group rectangle");
     }
 
     @Test
@@ -171,7 +171,7 @@ class ClassDiagramLayoutSubPackageTest {
 
     @Test
     void barycenterOrderingDiffersFromAlphabetical() {
-        // beta.B and gamma.C both REALIZE alpha.A → alpha is pulled to the right by barycenter.
+        // beta.B and gamma.C both REALIZE alpha.A → alpha is pulled to the bottom by barycenter.
         var alphaA = ci(ROOT + ".alpha", "A");
         var betaB  = ci(ROOT + ".beta",  "B");
         var gammaC = ci(ROOT + ".gamma", "C");
@@ -184,15 +184,15 @@ class ClassDiagramLayoutSubPackageTest {
             .enableSubPackageGrouping(ROOT, 30)
             .layout(layers, rels);
 
-        int alphaX = result.packageGroups().stream()
-            .filter(p -> p.label().equals("alpha")).findFirst().orElseThrow().x();
-        int betaX  = result.packageGroups().stream()
-            .filter(p -> p.label().equals("beta")).findFirst().orElseThrow().x();
-        int gammaX = result.packageGroups().stream()
-            .filter(p -> p.label().equals("gamma")).findFirst().orElseThrow().x();
+        int alphaY = result.packageGroups().stream()
+            .filter(p -> p.label().equals("alpha")).findFirst().orElseThrow().y();
+        int betaY  = result.packageGroups().stream()
+            .filter(p -> p.label().equals("beta")).findFirst().orElseThrow().y();
+        int gammaY = result.packageGroups().stream()
+            .filter(p -> p.label().equals("gamma")).findFirst().orElseThrow().y();
 
-        // Barycenter expected order: beta < gamma < alpha (alpha is rightmost).
-        assertTrue(betaX < alphaX,  "barycenter places beta left of alpha");
-        assertTrue(gammaX < alphaX, "barycenter places gamma left of alpha");
+        // Barycenter expected order: beta above gamma above alpha (alpha at bottom).
+        assertTrue(betaY < alphaY,  "barycenter places beta above alpha");
+        assertTrue(gammaY < alphaY, "barycenter places gamma above alpha");
     }
 }

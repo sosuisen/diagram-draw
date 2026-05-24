@@ -56,7 +56,7 @@ public class ClassDiagramGenerator {
     /**
      * サブパッケージグルーピングを有効化する。
      *
-     * @param packageGap サブパッケージスロット間の水平隙間（px、0以上）
+     * @param packageGap サブパッケージスロット間の垂直隙間（px、0以上）
      * @return このジェネレーター自身（メソッドチェーン用）
      * @throws IllegalArgumentException packageGapが0未満の場合
      */

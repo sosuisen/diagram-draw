@@ -58,11 +58,12 @@ public class ClassDiagramLayout {
 
     /**
      * サブパッケージグルーピングを有効化する。設定すると {@link #layout} が
-     * 各ConnectedComponent内を {@code (groupIndex, packageName)} ごとの水平スロットに分割し、
-     * 非ルートスロットを {@link PackageGroupBox} で囲む。未呼出時は既存レイアウトと同一出力。
+     * 各ConnectedComponent内を {@code (groupIndex, packageName)} ごとの垂直スロットに分割し、
+     * 非ルートスロットを {@link PackageGroupBox} で囲む。ルートパッケージのクラスは上端に配置（矩形なし）。
+     * 未呼出時は既存レイアウトと同一出力。
      *
      * @param rootPackage スキャン対象パッケージ名（相対サブパッケージラベル算出に使用）
-     * @param packageGap  サブパッケージスロット間の水平隙間（px、0以上）
+     * @param packageGap  サブパッケージスロット間の垂直隙間（px、0以上）
      * @return このレイアウト自身（メソッドチェーン用）
      * @throws NullPointerException     rootPackageがnullの場合
      * @throws IllegalArgumentException packageGapが0未満の場合
@@ -406,30 +407,36 @@ public class ClassDiagramLayout {
 
             var slotOrder = orderSlotsByBarycenter(slotMembers, relations);
 
-            int slotStartX = currentGroupX;
+            int contentY = slotStartY;
+            int ccMaxRight = currentGroupX;
             for (var key : slotOrder) {
                 var slot = slotMembers.get(key);
-                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, slotStartX, slotStartY);
+                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, currentGroupX, contentY);
                 if (!key.isEmpty()) {
                     result.add(new PackageGroupBox(
                         key,
-                        slotStartX - GROUP_PADDING_LEFT,
-                        slotStartY - GROUP_PADDING_TOP,
+                        currentGroupX - GROUP_PADDING_LEFT,
+                        contentY - GROUP_PADDING_TOP,
                         dims.width() + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
                         dims.height() + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
                     ));
                 }
-                slotStartX += dims.width() + (key.isEmpty() ? 0 : GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT) + packageGap;
+                int slotRightEdge = currentGroupX + dims.width() + (key.isEmpty() ? 0 : GROUP_PADDING_RIGHT);
+                ccMaxRight = Math.max(ccMaxRight, slotRightEdge);
+                int slotBottomEdge = contentY + dims.height() + (key.isEmpty() ? 0 : GROUP_PADDING_BOTTOM);
+                // Next slot is always non-root (root only ever appears as the first slot),
+                // so unconditionally reserve GROUP_PADDING_TOP for the next rectangle's label area.
+                contentY = slotBottomEdge + packageGap + GROUP_PADDING_TOP;
             }
 
-            currentGroupX = slotStartX - packageGap + groupGap;
+            currentGroupX = ccMaxRight + groupGap;
         }
 
         return result;
     }
 
     /**
-     * スロット順序を決定: ルートを左端固定、残りを単一パス重心法で並べる。
+     * スロット順序を決定: ルートを先頭（上端）固定、残りを単一パス重心法で並べる。
      *
      * <p>初期インデックスはアルファベット順。各非ルートスロットの重心 = そのスロットメンバーが
      * source または target に含まれる relation のうち、相手側クラスが別スロットに属するものについて、

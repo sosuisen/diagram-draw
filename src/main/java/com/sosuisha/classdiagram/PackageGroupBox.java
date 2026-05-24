@@ -110,9 +110,10 @@ public final class PackageGroupBox implements SvgElement {
                     0, height,
                     fillColor));
         }
-        // 6 sketchy outline segments tracing the tabbed shape clockwise.
+        // Outline tracing the tabbed shape clockwise. Tab right uses a straight line
+        // because the segment is too short for the wobble to look natural.
         sb.append(sketchyLine(0, 0, tabWidth, 0, rng));                     // tab top
-        sb.append(sketchyLine(tabWidth, 0, tabWidth, TAB_HEIGHT, rng));     // tab right
+        sb.append(straightPath(tabWidth, 0, tabWidth, TAB_HEIGHT));         // tab right (straight)
         sb.append(sketchyLine(tabWidth, TAB_HEIGHT, width, TAB_HEIGHT, rng)); // main top (right of tab)
         sb.append(sketchyLine(width, TAB_HEIGHT, width, height, rng));      // main right
         sb.append(sketchyLine(width, height, 0, height, rng));              // main bottom
@@ -142,5 +143,10 @@ public final class PackageGroupBox implements SvgElement {
         }
         return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"black\"/>"
             .formatted(x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2);
+    }
+
+    private static String straightPath(int x1, int y1, int x2, int y2) {
+        return "<path d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"black\"/>"
+            .formatted(x1, y1, x2, y2);
     }
 }

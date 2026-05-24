@@ -390,7 +390,10 @@ public class ClassDiagramLayout {
         }
 
         var result = new ArrayList<PackageGroupBox>();
-        int currentGroupX = canvasPaddingX;
+        // Initialize with GROUP_PADDING_LEFT offset so the first non-root box border lands at canvasPaddingX.
+        int currentGroupX = canvasPaddingX + GROUP_PADDING_LEFT;
+        // Clamp slot startY so the PackageGroupBox top edge is never negative.
+        int slotStartY = Math.max(canvasPaddingY, GROUP_PADDING_TOP);
 
         for (var groupEntry : byGroup.entrySet()) {
             var members = groupEntry.getValue();
@@ -412,17 +415,17 @@ public class ClassDiagramLayout {
             int slotStartX = currentGroupX;
             for (var key : slotOrder) {
                 var slot = slotMembers.get(key);
-                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, slotStartX, canvasPaddingY);
+                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, slotStartX, slotStartY);
                 if (!key.isEmpty()) {
                     result.add(new PackageGroupBox(
                         key,
                         slotStartX - GROUP_PADDING_LEFT,
-                        canvasPaddingY - GROUP_PADDING_TOP,
-                        dims[0] + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
-                        dims[1] + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
+                        slotStartY - GROUP_PADDING_TOP,
+                        dims.width() + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
+                        dims.height() + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
                     ));
                 }
-                slotStartX += dims[0] + (key.isEmpty() ? 0 : GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT) + packageGap;
+                slotStartX += dims.width() + (key.isEmpty() ? 0 : GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT) + packageGap;
             }
 
             currentGroupX = slotStartX - packageGap + groupGap;
@@ -430,6 +433,8 @@ public class ClassDiagramLayout {
 
         return result;
     }
+
+    private record SlotDimensions(int width, int height) {}
 
     private String slotKeyFor(ClassInfo info) {
         if (info.packageName().equals(rootPackageForGrouping)) return "";
@@ -443,9 +448,9 @@ public class ClassDiagramLayout {
     /**
      * 1スロットを縦配置し、配置後のスロット幅・高さを返す。
      *
-     * @return {{@code width}, {@code height}}
+     * @return スロットの幅・高さを保持する {@link SlotDimensions}
      */
-    private int[] layoutSingleSlot(
+    private SlotDimensions layoutSingleSlot(
             List<ClassInfo> members,
             Map<ClassInfo, Integer> originalLayerIndex,
             Map<ClassInfo, ClassBox> boxMap,
@@ -490,7 +495,7 @@ public class ClassDiagramLayout {
         }
 
         int slotHeight = (currentY - startY) - (byLayer.isEmpty() ? 0 : verticalGap);
-        return new int[] { slotWidth, slotHeight };
+        return new SlotDimensions(slotWidth, slotHeight);
     }
 
     private static Map<ClassInfo, Set<ClassInfo>> buildImplToIfaceInfosMap(

@@ -153,6 +153,28 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void horizontalShiftAlignsNarrowSlotCenterToWideNeighbor() {
+        // alpha has a short-name class (width = MIN_WIDTH = 100).
+        // beta has a long-name class (wider than MIN_WIDTH).
+        // alpha → beta cross-slot relation. Horizontal barycenter should shift alpha right
+        // so its slot center aligns with beta's center.
+        var alphaShort = ci(ROOT + ".alpha", "S");
+        var betaLong   = ci(ROOT + ".beta",  "VeryLongClassName");
+        var rels = List.of(rel(alphaShort, betaLong));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var alphaBox = result.boxes().stream().filter(b -> b.name().equals("S")).findFirst().orElseThrow();
+        var betaBox  = result.boxes().stream().filter(b -> b.name().equals("VeryLongClassName")).findFirst().orElseThrow();
+        int alphaCenter = alphaBox.x() + alphaBox.width() / 2;
+        int betaCenter  = betaBox.x() + betaBox.width() / 2;
+        assertTrue(Math.abs(alphaCenter - betaCenter) <= 1,
+            "alpha center (" + alphaCenter + ") should align with beta center (" + betaCenter + ") after horizontal shift");
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

@@ -407,11 +407,13 @@ public class ClassDiagramLayout {
 
             var slotOrder = orderSlotsByBarycenter(slotMembers, relations);
 
+            // First pass: initial placement (all slots left-aligned at currentGroupX).
+            var slotPlacements = new ArrayList<SlotPlacement>();
             int contentY = slotStartY;
-            int ccMaxRight = currentGroupX;
             for (var key : slotOrder) {
                 var slot = slotMembers.get(key);
                 var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, currentGroupX, contentY);
+                int boxIdx = -1;
                 if (!key.isEmpty()) {
                     result.add(new PackageGroupBox(
                         key,
@@ -420,15 +422,25 @@ public class ClassDiagramLayout {
                         dims.width() + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
                         dims.height() + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
                     ));
+                    boxIdx = result.size() - 1;
                 }
-                int slotRightEdge = currentGroupX + dims.width() + (key.isEmpty() ? 0 : GROUP_PADDING_RIGHT);
-                ccMaxRight = Math.max(ccMaxRight, slotRightEdge);
+                slotPlacements.add(new SlotPlacement(key, currentGroupX, dims.width(), slot, boxIdx));
                 int slotBottomEdge = contentY + dims.height() + (key.isEmpty() ? 0 : GROUP_PADDING_BOTTOM);
                 // Next slot is always non-root (root only ever appears as the first slot),
                 // so unconditionally reserve GROUP_PADDING_TOP for the next rectangle's label area.
                 contentY = slotBottomEdge + packageGap + GROUP_PADDING_TOP;
             }
 
+            // Second pass: shift slots horizontally so connected slots align in X (reduces arrow crossings).
+            var shifts = computeHorizontalShifts(slotPlacements, slotMembers, relations);
+            applySlotShifts(slotPlacements, shifts, boxMap, result);
+
+            int ccMaxRight = currentGroupX;
+            for (var sp : slotPlacements) {
+                int finalX = sp.initialX() + shifts.get(sp.key());
+                int rightEdge = finalX + sp.width() + (sp.key().isEmpty() ? 0 : GROUP_PADDING_RIGHT);
+                ccMaxRight = Math.max(ccMaxRight, rightEdge);
+            }
             currentGroupX = ccMaxRight + groupGap;
         }
 
@@ -500,6 +512,88 @@ public class ClassDiagramLayout {
     }
 
     private record SlotDimensions(int width, int height) {}
+
+    private record SlotPlacement(
+        String key,
+        int initialX,
+        int width,
+        List<ClassInfo> members,
+        int boxIndex
+    ) {}
+
+    /**
+     * 各スロットの水平シフト量を単一パス重心法で算出する。
+     *
+     * <p>各スロットの目標中心 X = クロススロット relation で繋がる相手側スロットの初期中心 X の平均。
+     * シフト = max(0, 目標中心 - 現在中心)。非負クランプにより右ドリフトと発散を防止する。
+     */
+    private Map<String, Integer> computeHorizontalShifts(
+            List<SlotPlacement> slotPlacements,
+            Map<String, List<ClassInfo>> slotMembers,
+            List<ClassRelation> relations) {
+
+        Map<ClassInfo, String> classToSlot = new HashMap<>();
+        for (var entry : slotMembers.entrySet()) {
+            for (var info : entry.getValue()) {
+                classToSlot.put(info, entry.getKey());
+            }
+        }
+
+        Map<String, Double> centers = new HashMap<>();
+        for (var sp : slotPlacements) {
+            centers.put(sp.key(), sp.initialX() + sp.width() / 2.0);
+        }
+
+        Map<String, Integer> shifts = new HashMap<>();
+        for (var sp : slotPlacements) {
+            var key = sp.key();
+            double sum = 0;
+            int count = 0;
+            for (var rel : relations) {
+                var srcSlot = classToSlot.get(rel.sourceClassInfo());
+                var tgtSlot = classToSlot.get(rel.targetClassInfo());
+                if (key.equals(srcSlot) && tgtSlot != null && !key.equals(tgtSlot)) {
+                    sum += centers.get(tgtSlot);
+                    count++;
+                } else if (key.equals(tgtSlot) && srcSlot != null && !key.equals(srcSlot)) {
+                    sum += centers.get(srcSlot);
+                    count++;
+                }
+            }
+            if (count > 0) {
+                int shift = (int) Math.round(sum / count - centers.get(key));
+                shifts.put(key, Math.max(0, shift));
+            } else {
+                shifts.put(key, 0);
+            }
+        }
+        return shifts;
+    }
+
+    private void applySlotShifts(
+            List<SlotPlacement> slotPlacements,
+            Map<String, Integer> shifts,
+            Map<ClassInfo, ClassBox> boxMap,
+            List<PackageGroupBox> packageGroups) {
+        for (var sp : slotPlacements) {
+            int shift = shifts.get(sp.key());
+            if (shift == 0) continue;
+            for (var info : sp.members()) {
+                var box = boxMap.get(info);
+                box.setPosition(box.x() + shift, box.y());
+            }
+            if (sp.boxIndex() >= 0) {
+                var oldBox = packageGroups.get(sp.boxIndex());
+                packageGroups.set(sp.boxIndex(), new PackageGroupBox(
+                    oldBox.label(),
+                    oldBox.x() + shift,
+                    oldBox.y(),
+                    oldBox.width(),
+                    oldBox.height()
+                ));
+            }
+        }
+    }
 
     private String slotKeyFor(ClassInfo info) {
         if (info.packageName().equals(rootPackageForGrouping)) return "";

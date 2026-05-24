@@ -36,4 +36,33 @@ class PackageGroupBoxTest {
         assertThrows(IllegalArgumentException.class,
             () -> new PackageGroupBox("p", 0, 0, 10, -1));
     }
+
+    @Test
+    void drawIncludesLabel() {
+        var box = new PackageGroupBox("service.impl", 0, 0, 100, 50);
+        assertTrue(box.draw().contains("service.impl"));
+    }
+
+    @Test
+    void drawIncludesDiagramDrawAttribute() {
+        var box = new PackageGroupBox("svc", 0, 0, 100, 50);
+        var svg = box.draw();
+        assertTrue(svg.contains("data-diagram-draw=\"package-group\""));
+        assertTrue(svg.contains("data-diagram-draw-name=\"svc\""));
+    }
+
+    @Test
+    void drawIncludesFourPathEdges() {
+        var box = new PackageGroupBox("p", 10, 20, 100, 50);
+        var svg = box.draw();
+        // 4 sketchy edges → 4 <path elements
+        int pathCount = svg.split("<path", -1).length - 1;
+        assertEquals(4, pathCount);
+    }
+
+    @Test
+    void drawAppliesTranslationWhenPositioned() {
+        var box = new PackageGroupBox("p", 10, 20, 100, 50);
+        assertTrue(box.draw().contains("translate(10,20)"));
+    }
 }

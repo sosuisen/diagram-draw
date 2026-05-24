@@ -168,4 +168,31 @@ class ClassDiagramLayoutSubPackageTest {
             assertTrue(pg.y() >= 0, "PackageGroupBox y must be >= 0, got " + pg.y());
         }
     }
+
+    @Test
+    void barycenterOrderingDiffersFromAlphabetical() {
+        // beta.B and gamma.C both REALIZE alpha.A → alpha is pulled to the right by barycenter.
+        var alphaA = ci(ROOT + ".alpha", "A");
+        var betaB  = ci(ROOT + ".beta",  "B");
+        var gammaC = ci(ROOT + ".gamma", "C");
+        var rels = List.of(
+            new ClassRelation(betaB,  alphaA, DependencyType.REALIZATION, false),
+            new ClassRelation(gammaC, alphaA, DependencyType.REALIZATION, false)
+        );
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        int alphaX = result.packageGroups().stream()
+            .filter(p -> p.label().equals("alpha")).findFirst().orElseThrow().x();
+        int betaX  = result.packageGroups().stream()
+            .filter(p -> p.label().equals("beta")).findFirst().orElseThrow().x();
+        int gammaX = result.packageGroups().stream()
+            .filter(p -> p.label().equals("gamma")).findFirst().orElseThrow().x();
+
+        // Barycenter expected order: beta < gamma < alpha (alpha is rightmost).
+        assertTrue(betaX < alphaX,  "barycenter places beta left of alpha");
+        assertTrue(gammaX < alphaX, "barycenter places gamma left of alpha");
+    }
 }

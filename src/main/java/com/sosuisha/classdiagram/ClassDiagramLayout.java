@@ -404,13 +404,7 @@ public class ClassDiagramLayout {
                 slotMembers.computeIfAbsent(slotKeyFor(info), k -> new ArrayList<>()).add(info);
             }
 
-            // Slot ordering: root first, then alphabetical. (Task 9 will replace this with barycenter.)
-            var slotOrder = new ArrayList<String>();
-            if (slotMembers.containsKey("")) slotOrder.add("");
-            slotMembers.keySet().stream()
-                .filter(k -> !k.isEmpty())
-                .sorted()
-                .forEach(slotOrder::add);
+            var slotOrder = orderSlotsByBarycenter(slotMembers, relations);
 
             int slotStartX = currentGroupX;
             for (var key : slotOrder) {
@@ -431,6 +425,70 @@ public class ClassDiagramLayout {
             currentGroupX = slotStartX - packageGap + groupGap;
         }
 
+        return result;
+    }
+
+    /**
+     * スロット順序を決定: ルートを左端固定、残りを単一パス重心法で並べる。
+     *
+     * <p>初期インデックスはアルファベット順。各非ルートスロットの重心 = そのスロットメンバーが
+     * source または target に含まれる relation のうち、相手側クラスが別スロットに属するものについて、
+     * 相手側スロットの初期インデックスを平均した値。relation が 0 件のスロットは初期インデックスを
+     * そのまま重心とする。単一パスのため発散しない。
+     */
+    private List<String> orderSlotsByBarycenter(
+            Map<String, List<ClassInfo>> slotMembers,
+            List<ClassRelation> relations) {
+
+        // Per-class → slot key lookup.
+        Map<ClassInfo, String> classToSlot = new HashMap<>();
+        for (var entry : slotMembers.entrySet()) {
+            for (var info : entry.getValue()) {
+                classToSlot.put(info, entry.getKey());
+            }
+        }
+
+        boolean hasRoot = slotMembers.containsKey("");
+        var nonRoot = slotMembers.keySet().stream()
+            .filter(k -> !k.isEmpty())
+            .sorted()
+            .collect(Collectors.toCollection(ArrayList::new));
+
+        // Initial index map: root = 0 (if present), then non-root in alphabetical order.
+        Map<String, Integer> idx = new HashMap<>();
+        int next = 0;
+        if (hasRoot) idx.put("", next++);
+        for (var k : nonRoot) idx.put(k, next++);
+
+        // Single-pass barycenter.
+        Map<String, Double> bary = new HashMap<>();
+        for (var key : nonRoot) {
+            double sum = 0;
+            int count = 0;
+            for (var rel : relations) {
+                var srcSlot = classToSlot.get(rel.sourceClassInfo());
+                var tgtSlot = classToSlot.get(rel.targetClassInfo());
+                if (key.equals(srcSlot) && tgtSlot != null && !key.equals(tgtSlot)) {
+                    sum += idx.get(tgtSlot);
+                    count++;
+                } else if (key.equals(tgtSlot) && srcSlot != null && !key.equals(srcSlot)) {
+                    sum += idx.get(srcSlot);
+                    count++;
+                }
+            }
+            bary.put(key, count > 0 ? sum / count : (double) idx.get(key));
+        }
+
+        // Stable sort non-root by barycenter; ties preserve alphabetical (initial) order.
+        nonRoot.sort((a, b) -> {
+            int cmp = Double.compare(bary.get(a), bary.get(b));
+            if (cmp != 0) return cmp;
+            return Integer.compare(idx.get(a), idx.get(b));
+        });
+
+        var result = new ArrayList<String>();
+        if (hasRoot) result.add("");
+        result.addAll(nonRoot);
         return result;
     }
 

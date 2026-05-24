@@ -245,6 +245,10 @@ public class ClassDiagramLayout {
             canvasHeight = maxBottom + canvasPaddingY;
         }
 
+        // Step 10: spread endpoints of edges sharing the same (box, edge) slot so that
+        // multiple incident edges don't bunch up at a single point.
+        spreadDependencyEndpoints(dependencies);
+
         return new LayoutResult(
             List.copyOf(boxMap.values()),
             List.copyOf(dependencies),
@@ -693,6 +697,83 @@ public class ClassDiagramLayout {
     }
 
     private record SlotDimensions(int width, int height) {}
+
+    private static final double EDGE_SPREAD_MARGIN_MAX = 20.0;
+    private static final double EDGE_SPREAD_MARGIN_RATIO = 0.15;
+
+    private record AnchorInfo(
+        Dependency dep, boolean isSource, ClassBox box,
+        Dependency.BoxEdge edge, double naturalPos
+    ) {}
+
+    private record EdgeKey(ClassBox box, Dependency.BoxEdge edge) {}
+
+    /**
+     * 同じ (box, 辺) を共有する複数エッジの端点を、辺の自然交差順を保ったまま等間隔に分散する。
+     * 1 本だけのエッジは現状の自然位置のまま。
+     */
+    private void spreadDependencyEndpoints(List<Dependency> dependencies) {
+        Map<EdgeKey, List<AnchorInfo>> groups = new LinkedHashMap<>();
+        for (var dep : dependencies) {
+            var src = dep.source();
+            var tgt = dep.target();
+            double scx = src.x() + src.width() / 2.0;
+            double scy = src.y() + src.height() / 2.0;
+            double tcx = tgt.x() + tgt.width() / 2.0;
+            double tcy = tgt.y() + tgt.height() / 2.0;
+            double dx = tcx - scx;
+            double dy = tcy - scy;
+            double len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 0.001) continue;
+            double nx = dx / len;
+            double ny = dy / len;
+            double[] sp = Dependency.edgeIntersection(src, nx, ny);
+            double[] tp = Dependency.edgeIntersection(tgt, -nx, -ny);
+            var srcEdge = Dependency.whichEdge(src, sp[0], sp[1]);
+            var tgtEdge = Dependency.whichEdge(tgt, tp[0], tp[1]);
+            double srcNatural = (srcEdge == Dependency.BoxEdge.TOP || srcEdge == Dependency.BoxEdge.BOTTOM) ? sp[0] : sp[1];
+            double tgtNatural = (tgtEdge == Dependency.BoxEdge.TOP || tgtEdge == Dependency.BoxEdge.BOTTOM) ? tp[0] : tp[1];
+            groups.computeIfAbsent(new EdgeKey(src, srcEdge), k -> new ArrayList<>())
+                .add(new AnchorInfo(dep, true, src, srcEdge, srcNatural));
+            groups.computeIfAbsent(new EdgeKey(tgt, tgtEdge), k -> new ArrayList<>())
+                .add(new AnchorInfo(dep, false, tgt, tgtEdge, tgtNatural));
+        }
+
+        for (var entry : groups.entrySet()) {
+            var list = entry.getValue();
+            if (list.size() <= 1) continue;
+            list.sort(Comparator.comparingDouble(AnchorInfo::naturalPos));
+            var box = entry.getKey().box();
+            var edge = entry.getKey().edge();
+            boolean horizontal = (edge == Dependency.BoxEdge.TOP || edge == Dependency.BoxEdge.BOTTOM);
+            double rangeStart = horizontal ? box.x() : box.y();
+            double rangeLen = horizontal ? box.width() : box.height();
+            double margin = Math.min(EDGE_SPREAD_MARGIN_MAX, rangeLen * EDGE_SPREAD_MARGIN_RATIO);
+            double available = rangeLen - 2 * margin;
+            int n = list.size();
+            for (int i = 0; i < n; i++) {
+                double t = (double) (i + 1) / (n + 1);
+                double posOnEdge = rangeStart + margin + t * available;
+                double x;
+                double y;
+                double dirX;
+                double dirY;
+                switch (edge) {
+                    case TOP -> { x = posOnEdge; y = box.y(); dirX = 0; dirY = -1; }
+                    case BOTTOM -> { x = posOnEdge; y = box.y() + box.height(); dirX = 0; dirY = 1; }
+                    case LEFT -> { x = box.x(); y = posOnEdge; dirX = -1; dirY = 0; }
+                    case RIGHT -> { x = box.x() + box.width(); y = posOnEdge; dirX = 1; dirY = 0; }
+                    default -> { continue; }
+                }
+                var info = list.get(i);
+                if (info.isSource()) {
+                    info.dep().setSourceAnchor(x, y, dirX, dirY);
+                } else {
+                    info.dep().setTargetAnchor(x, y, dirX, dirY);
+                }
+            }
+        }
+    }
 
     /**
      * 1スロットを縦配置し、配置後のスロット幅・高さを返す。

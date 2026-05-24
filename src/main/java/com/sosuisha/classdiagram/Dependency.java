@@ -19,9 +19,16 @@ public final class Dependency implements SvgElement {
     private static final double CURVE_OFFSET_MIN = 20.0;
     private static final double CURVE_OFFSET_RATIO = 1.0 / 3.0;
 
+    /** 矩形の 4 辺を識別する列挙。 */
+    public enum BoxEdge { TOP, RIGHT, BOTTOM, LEFT }
+
     private final ClassBox source;
     private final ClassBox target;
     private final DependencyType type;
+    private double[] customSourceAnchor;
+    private double[] customSourceDir;
+    private double[] customTargetAnchor;
+    private double[] customTargetDir;
 
     /**
      * 依存関係を生成する。
@@ -48,6 +55,23 @@ public final class Dependency implements SvgElement {
 
     /** @return 依存の種類 */
     public DependencyType type() { return type; }
+
+    /**
+     * ソース端点と出口方向を明示的に上書きする。レイアウト側が辺上の複数エッジを分散配置する
+     * ために使用する。未設定時は中心レイ法でソース辺と交差する点を自動計算する。
+     */
+    public void setSourceAnchor(double x, double y, double dirX, double dirY) {
+        this.customSourceAnchor = new double[]{x, y};
+        this.customSourceDir = new double[]{dirX, dirY};
+    }
+
+    /**
+     * ターゲット端点と入口方向を明示的に上書きする。
+     */
+    public void setTargetAnchor(double x, double y, double dirX, double dirY) {
+        this.customTargetAnchor = new double[]{x, y};
+        this.customTargetDir = new double[]{dirX, dirY};
+    }
 
     /**
      * 依存関係のSVG表現を返す。
@@ -78,10 +102,24 @@ public final class Dependency implements SvgElement {
         double nx = dx / len;
         double ny = dy / len;
 
-        double[] sp = edgeIntersection(source, nx, ny);
-        double[] tp = edgeIntersection(target, -nx, -ny);
-        double[] exitDir = outwardNormal(source, sp[0], sp[1]);
-        double[] entryDir = outwardNormal(target, tp[0], tp[1]);
+        double[] sp;
+        double[] exitDir;
+        if (customSourceAnchor != null) {
+            sp = customSourceAnchor;
+            exitDir = customSourceDir;
+        } else {
+            sp = edgeIntersection(source, nx, ny);
+            exitDir = outwardNormal(source, sp[0], sp[1]);
+        }
+        double[] tp;
+        double[] entryDir;
+        if (customTargetAnchor != null) {
+            tp = customTargetAnchor;
+            entryDir = customTargetDir;
+        } else {
+            tp = edgeIntersection(target, -nx, -ny);
+            entryDir = outwardNormal(target, tp[0], tp[1]);
+        }
 
         if (type == DependencyType.REALIZATION) {
             return drawRealization(sp, tp, exitDir, entryDir);
@@ -111,7 +149,7 @@ public final class Dependency implements SvgElement {
     /**
      * 矩形辺上の点 {@code (px, py)} における外向き法線ベクトルを返す。
      */
-    private static double[] outwardNormal(ClassBox box, double px, double py) {
+    static double[] outwardNormal(ClassBox box, double px, double py) {
         double tol = 0.5;
         if (Math.abs(px - box.x()) < tol) return new double[]{-1.0, 0.0};
         if (Math.abs(px - (box.x() + box.width())) < tol) return new double[]{1.0, 0.0};
@@ -159,7 +197,20 @@ public final class Dependency implements SvgElement {
      * @param dirY 方向ベクトルのY成分（正規化済み）
      * @return ボックス辺上の交差点 [x, y]
      */
-    private static double[] edgeIntersection(ClassBox box, double dirX, double dirY) {
+    /**
+     * 矩形辺上の点 {@code (px, py)} がどの辺に属するかを返す。同じ点が複数辺の境界（角）に
+     * あるときは LEFT / RIGHT / TOP / BOTTOM の順で先に一致した辺を返す。
+     */
+    static BoxEdge whichEdge(ClassBox box, double px, double py) {
+        double tol = 0.5;
+        if (Math.abs(px - box.x()) < tol) return BoxEdge.LEFT;
+        if (Math.abs(px - (box.x() + box.width())) < tol) return BoxEdge.RIGHT;
+        if (Math.abs(py - box.y()) < tol) return BoxEdge.TOP;
+        if (Math.abs(py - (box.y() + box.height())) < tol) return BoxEdge.BOTTOM;
+        return BoxEdge.BOTTOM;
+    }
+
+    static double[] edgeIntersection(ClassBox box, double dirX, double dirY) {
         double cx = box.x() + box.width() / 2.0;
         double cy = box.y() + box.height() / 2.0;
         double minT = Double.MAX_VALUE;

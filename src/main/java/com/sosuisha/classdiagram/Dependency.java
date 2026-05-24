@@ -264,7 +264,7 @@ public final class Dependency implements SvgElement {
     }
 
     private String drawDiamond(double[] pts) {
-        String fill = type == DependencyType.COMPOSITION ? "black" : "none";
+        String fill = type == DependencyType.COMPOSITION ? "black" : "white";
         return "<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"%s\" stroke=\"black\"/>".formatted(
             pts[0], pts[1], pts[2], pts[3], pts[4], pts[5], pts[6], pts[7], fill);
     }

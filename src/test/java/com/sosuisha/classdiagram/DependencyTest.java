@@ -69,10 +69,13 @@ class DependencyTest {
     }
 
     @Test
-    void aggregationDiamondIsNotFilled() {
-        var result = dep(DependencyType.AGGREGATION).draw();
-        assertTrue(result.contains("fill=\"none\""));
-        assertFalse(result.contains("fill=\"black\""));
+    void aggregationDiamondIsFilledWhite() {
+        var svg = dep(DependencyType.AGGREGATION).draw();
+        // The aggregation diamond is rendered as a polygon with fill="white"
+        // (composition's polygon has fill="black"; dependency curve uses fill="none").
+        assertTrue(svg.contains("<polygon"));
+        assertTrue(svg.contains("fill=\"white\""));
+        assertFalse(svg.contains("fill=\"black\""));
     }
 
     @Test

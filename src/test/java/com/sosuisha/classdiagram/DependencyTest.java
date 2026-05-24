@@ -47,8 +47,10 @@ class DependencyTest {
     }
 
     @Test
-    void drawContainsLine() {
-        assertTrue(dep(DependencyType.COMPOSITION).draw().contains("<line"));
+    void drawContainsCurvePath() {
+        var svg = dep(DependencyType.COMPOSITION).draw();
+        assertTrue(svg.contains("<path "), "edge should be drawn as <path>");
+        assertTrue(svg.contains(" Q "), "path should use a quadratic Bezier (Q) curve command");
     }
 
     @Test
@@ -74,17 +76,19 @@ class DependencyTest {
     }
 
     @Test
-    void drawLineDoesNotStartAtSourceCenter() {
-        // ソース中心X = 0 + 100/2 = 50。辺上の点なのでx1 != 50 のはず
+    void drawCurveDoesNotStartAtSourceCenter() {
+        // ソース中心X = 50。曲線パスは "M sx,sy ..." の形なので "M 50.0," は含まれないはず
         var result = dep(DependencyType.COMPOSITION).draw();
-        assertFalse(result.contains("x1=\"50.0\""));
+        assertFalse(result.contains("M 50.0,"));
     }
 
     @Test
-    void drawLineDoesNotEndAtTargetCenter() {
-        // ターゲット中心X = 200 + 100/2 = 250。辺上の点なのでx2 != 250 のはず
+    void drawCurveDoesNotEndAtTargetCenter() {
+        // ターゲット中心X = 250。曲線の終点は ".. 250.0,..." 形式では現れないはず（辺上の点）
         var result = dep(DependencyType.COMPOSITION).draw();
-        assertFalse(result.contains("x2=\"250.0\""));
+        // 曲線パスの末尾は "Q cpx,cpy ex,ey"。ex=250.0 ならテスト対象が辺上にないことになる。
+        assertFalse(result.matches(".* Q [^ ]+ 250\\.0,.*"),
+            "curve should not end at target center X (250.0)");
     }
 
     private static Dependency realizationDep() {

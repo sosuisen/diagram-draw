@@ -16,6 +16,9 @@ public final class Dependency implements SvgElement {
     private static final int TRIANGLE_HALF_WIDTH = 8;
     private static final int ARROWHEAD_LEN = 10;
     private static final double ARROWHEAD_HALF_ANGLE = Math.PI / 6.0; // 30 degrees
+    private static final double CURVE_OFFSET_RATIO = 0.1;
+    private static final double CURVE_OFFSET_MIN = 15.0;
+    private static final double CURVE_OFFSET_MAX = 60.0;
 
     private final ClassBox source;
     private final ClassBox target;
@@ -98,9 +101,34 @@ public final class Dependency implements SvgElement {
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
         sb.append(drawDiamond(diamond));
-        sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\"/>".formatted(lineX1, lineY1, tp[0], tp[1]));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\"/>".formatted(
+            quadraticBezierPath(lineX1, lineY1, tp[0], tp[1])));
         sb.append("</g>");
         return sb.toString();
+    }
+
+    /**
+     * 2点を結ぶ二次ベジエ曲線の SVG path コマンド文字列を返す。
+     * 制御点は線分の中点を、線分に直交する方向に長さ依存のオフセットを与えた位置に置く。
+     */
+    private static String quadraticBezierPath(double sx, double sy, double ex, double ey) {
+        double dx = ex - sx;
+        double dy = ey - sy;
+        double len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 0.001) {
+            return "M %.1f,%.1f L %.1f,%.1f".formatted(sx, sy, ex, ey);
+        }
+        double nx = dx / len;
+        double ny = dy / len;
+        double px = -ny;
+        double py = nx;
+        double offset = Math.min(CURVE_OFFSET_MAX,
+            Math.max(CURVE_OFFSET_MIN, len * CURVE_OFFSET_RATIO));
+        double midX = (sx + ex) / 2.0;
+        double midY = (sy + ey) / 2.0;
+        double cpx = midX + px * offset;
+        double cpy = midY + py * offset;
+        return "M %.1f,%.1f Q %.1f,%.1f %.1f,%.1f".formatted(sx, sy, cpx, cpy, ex, ey);
     }
 
     /**
@@ -192,8 +220,8 @@ public final class Dependency implements SvgElement {
 
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
-        sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
-            sp[0], sp[1], baseCx, baseCy));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
+            quadraticBezierPath(sp[0], sp[1], baseCx, baseCy)));
         sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"black\"/>".formatted(
             tp[0], tp[1], bx1, by1, bx2, by2));
         sb.append("</g>");
@@ -209,8 +237,8 @@ public final class Dependency implements SvgElement {
 
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
-        sb.append("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
-            sp[0], sp[1], tp[0], tp[1]));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
+            quadraticBezierPath(sp[0], sp[1], tp[0], tp[1])));
         sb.append("<polyline points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"none\" stroke=\"black\"/>".formatted(
             ax1, ay1, tp[0], tp[1], ax2, ay2));
         sb.append("</g>");

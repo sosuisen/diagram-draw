@@ -16,7 +16,8 @@ public final class Dependency implements SvgElement {
     private static final int TRIANGLE_HALF_WIDTH = 8;
     private static final int ARROWHEAD_LEN = 10;
     private static final double ARROWHEAD_HALF_ANGLE = Math.PI / 6.0; // 30 degrees
-    private static final double CURVE_OFFSET_MIN = 30.0;
+    private static final double CURVE_OFFSET_MIN = 20.0;
+    private static final double CURVE_OFFSET_RATIO = 1.0 / 3.0;
 
     private final ClassBox source;
     private final ClassBox target;
@@ -131,7 +132,7 @@ public final class Dependency implements SvgElement {
         double dy = ey - sy;
         double exitProj = Math.abs(dx * exitDir[0] + dy * exitDir[1]);
         double entryProj = Math.abs(dx * entryDir[0] + dy * entryDir[1]);
-        double offset = Math.max(CURVE_OFFSET_MIN, Math.max(exitProj, entryProj) / 2.0);
+        double offset = Math.max(CURVE_OFFSET_MIN, Math.max(exitProj, entryProj) * CURVE_OFFSET_RATIO);
         double c1x = sx + exitDir[0] * offset;
         double c1y = sy + exitDir[1] * offset;
         double c2x = ex + entryDir[0] * offset;

@@ -82,34 +82,45 @@ public final class PackageGroupBox implements SvgElement {
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int LABEL_PADDING_X = 6;
     private static final int LABEL_PADDING_Y = 4;
+    private static final int TAB_HEIGHT = FONT_SIZE + LABEL_PADDING_Y * 2;
     private static final double SKETCH_MAX = 1.5;
 
     /**
-     * PackageGroupBoxのSVG表現を返す。
+     * PackageGroupBoxのSVG表現を返す。UML 標準のタブ付きフォルダ形状で描画する。
+     * バウンディングボックス内の上部 {@code TAB_HEIGHT} 分がタブ領域、その下が本体矩形。
      *
      * @return SVGのgタグ文字列
      */
     @Override
     public String draw() {
         var rng = new Random(Objects.hash(label, width, height));
+        int tabWidth = Math.min(label.length() * CHAR_WIDTH + LABEL_PADDING_X * 2, width);
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"package-group\" data-diagram-draw-name=\"%s\" transform=\"translate(%d,%d)\">"
             .formatted(label, x, y));
         if (fillColor != null) {
-            sb.append("<rect width=\"%d\" height=\"%d\" fill=\"%s\"/>".formatted(width, height, fillColor));
+            // Single polygon traces the combined tab + main outline so the fill matches the shape.
+            sb.append("<polygon points=\"%d,%d %d,%d %d,%d %d,%d %d,%d %d,%d\" fill=\"%s\" stroke=\"none\"/>"
+                .formatted(
+                    0, 0,
+                    tabWidth, 0,
+                    tabWidth, TAB_HEIGHT,
+                    width, TAB_HEIGHT,
+                    width, height,
+                    0, height,
+                    fillColor));
         }
-        // 4 sketchy edges (top, right, bottom, left)
-        sb.append(sketchyLine(0, 0, width, 0, rng));
-        sb.append(sketchyLine(width, 0, width, height, rng));
-        sb.append(sketchyLine(width, height, 0, height, rng));
-        sb.append(sketchyLine(0, height, 0, 0, rng));
-        // Label background (white rect to "cut" the top edge under the text)
-        int labelWidth = label.length() * CHAR_WIDTH + LABEL_PADDING_X * 2;
-        sb.append("<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"white\"/>"
-            .formatted(LABEL_PADDING_X, -FONT_SIZE / 2, labelWidth, FONT_SIZE + LABEL_PADDING_Y));
-        int textY = LABEL_PADDING_Y + FONT_SIZE * 4 / 5 - FONT_SIZE / 2;
+        // 6 sketchy outline segments tracing the tabbed shape clockwise.
+        sb.append(sketchyLine(0, 0, tabWidth, 0, rng));                     // tab top
+        sb.append(sketchyLine(tabWidth, 0, tabWidth, TAB_HEIGHT, rng));     // tab right
+        sb.append(sketchyLine(tabWidth, TAB_HEIGHT, width, TAB_HEIGHT, rng)); // main top (right of tab)
+        sb.append(sketchyLine(width, TAB_HEIGHT, width, height, rng));      // main right
+        sb.append(sketchyLine(width, height, 0, height, rng));              // main bottom
+        sb.append(sketchyLine(0, height, 0, 0, rng));                       // left (full height)
+        // Label inside the tab.
+        int textY = LABEL_PADDING_Y + FONT_SIZE * 4 / 5;
         sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\">%s</text>"
-            .formatted(LABEL_PADDING_X * 2, textY, FONT_SIZE, label));
+            .formatted(LABEL_PADDING_X, textY, FONT_SIZE, label));
         sb.append("</g>");
         return sb.toString();
     }

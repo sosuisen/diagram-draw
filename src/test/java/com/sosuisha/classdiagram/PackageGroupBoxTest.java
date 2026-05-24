@@ -52,12 +52,13 @@ class PackageGroupBoxTest {
     }
 
     @Test
-    void drawIncludesFourPathEdges() {
+    void drawIncludesSixPathEdgesForTabbedShape() {
         var box = new PackageGroupBox("p", 10, 20, 100, 50);
         var svg = box.draw();
-        // 4 sketchy edges → 4 <path elements
+        // Tabbed shape outline has 6 segments: tab top, tab right, main top (right of tab),
+        // main right, main bottom, full-height left.
         int pathCount = svg.split("<path", -1).length - 1;
-        assertEquals(4, pathCount);
+        assertEquals(6, pathCount);
     }
 
     @Test

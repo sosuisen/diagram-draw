@@ -391,218 +391,165 @@ public class ClassDiagramLayout {
         }
 
         var result = new ArrayList<PackageGroupBox>();
-        // Initialize with GROUP_PADDING_LEFT offset so the first non-root box border lands at canvasPaddingX.
-        int currentGroupX = canvasPaddingX + GROUP_PADDING_LEFT;
-        // Clamp slot startY so the PackageGroupBox top edge is never negative.
+        int currentGroupX = canvasPaddingX;
+        // Clamp slot startY so any non-root PackageGroupBox top edge is never negative.
         int slotStartY = Math.max(canvasPaddingY, GROUP_PADDING_TOP);
 
         for (var groupEntry : byGroup.entrySet()) {
-            var members = groupEntry.getValue();
-
-            // Partition members by slot key ("" for root, relative pkg name otherwise).
-            Map<String, List<ClassInfo>> slotMembers = new LinkedHashMap<>();
-            for (var info : members) {
-                slotMembers.computeIfAbsent(slotKeyFor(info), k -> new ArrayList<>()).add(info);
-            }
-
-            var slotOrder = orderSlotsByBarycenter(slotMembers, relations);
-
-            // First pass: initial placement (all slots left-aligned at currentGroupX).
-            var slotPlacements = new ArrayList<SlotPlacement>();
-            int contentY = slotStartY;
-            for (var key : slotOrder) {
-                var slot = slotMembers.get(key);
-                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, currentGroupX, contentY);
-                int boxIdx = -1;
-                if (!key.isEmpty()) {
-                    result.add(new PackageGroupBox(
-                        key,
-                        currentGroupX - GROUP_PADDING_LEFT,
-                        contentY - GROUP_PADDING_TOP,
-                        dims.width() + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
-                        dims.height() + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
-                    ));
-                    boxIdx = result.size() - 1;
-                }
-                slotPlacements.add(new SlotPlacement(key, currentGroupX, dims.width(), slot, boxIdx));
-                int slotBottomEdge = contentY + dims.height() + (key.isEmpty() ? 0 : GROUP_PADDING_BOTTOM);
-                // Next slot is always non-root (root only ever appears as the first slot),
-                // so unconditionally reserve GROUP_PADDING_TOP for the next rectangle's label area.
-                contentY = slotBottomEdge + packageGap + GROUP_PADDING_TOP;
-            }
-
-            // Second pass: shift slots horizontally so connected slots align in X (reduces arrow crossings).
-            var shifts = computeHorizontalShifts(slotPlacements, slotMembers, relations);
-            applySlotShifts(slotPlacements, shifts, boxMap, result);
-
-            int ccMaxRight = currentGroupX;
-            for (var sp : slotPlacements) {
-                int finalX = sp.initialX() + shifts.get(sp.key());
-                int rightEdge = finalX + sp.width() + (sp.key().isEmpty() ? 0 : GROUP_PADDING_RIGHT);
-                ccMaxRight = Math.max(ccMaxRight, rightEdge);
-            }
-            currentGroupX = ccMaxRight + groupGap;
+            var ccRoot = buildPackageTree(groupEntry.getValue());
+            var dims = layoutPackageNode(ccRoot, currentGroupX, slotStartY,
+                originalLayerIndex, boxMap, result, relations);
+            currentGroupX += dims.width() + groupGap;
         }
 
         return result;
     }
 
     /**
-     * スロット順序を決定: ルートを先頭（上端）固定、残りを単一パス重心法で並べる。
-     *
-     * <p>初期インデックスはアルファベット順。各非ルートスロットの重心 = そのスロットメンバーが
-     * source または target に含まれる relation のうち、相手側クラスが別スロットに属するものについて、
-     * 相手側スロットの初期インデックスを平均した値。relation が 0 件のスロットは初期インデックスを
-     * そのまま重心とする。単一パスのため発散しない。
+     * 1パッケージを表すツリーノード。ルートノードは {@code localLabel == ""} で矩形なし。
      */
-    private List<String> orderSlotsByBarycenter(
-            Map<String, List<ClassInfo>> slotMembers,
+    private static final class PackageNode {
+        final String localLabel;
+        final List<ClassInfo> directClasses = new ArrayList<>();
+        final Map<String, PackageNode> children = new LinkedHashMap<>();
+
+        PackageNode(String localLabel) {
+            this.localLabel = localLabel;
+        }
+    }
+
+    /**
+     * ConnectedComponent のクラス群からパッケージツリーを構築する。
+     * 直接クラスを持たない中間パッケージもノードとして含める。
+     */
+    private PackageNode buildPackageTree(List<ClassInfo> members) {
+        var root = new PackageNode("");
+        for (var info : members) {
+            var pkg = info.packageName();
+            if (pkg.equals(rootPackageForGrouping)
+                    || !pkg.startsWith(rootPackageForGrouping + ".")) {
+                // Root-package class, or defensive fallback for classes outside the scanned root.
+                root.directClasses.add(info);
+                continue;
+            }
+            var relative = pkg.substring(rootPackageForGrouping.length() + 1);
+            var current = root;
+            for (var part : relative.split("\\.")) {
+                current = current.children.computeIfAbsent(part, PackageNode::new);
+            }
+            current.directClasses.add(info);
+        }
+        return root;
+    }
+
+    /**
+     * ノードを再帰的に配置。直接クラスを上部、子ノード矩形を下部に縦積みする。
+     * 非ルートノードは {@link PackageGroupBox} に囲まれる。
+     *
+     * @param x ノード自身の矩形（あれば）の左上 X 座標
+     * @param y ノード自身の矩形（あれば）の左上 Y 座標
+     * @return ノード全体（矩形を含む）の幅・高さ
+     */
+    private SlotDimensions layoutPackageNode(
+            PackageNode node,
+            int x, int y,
+            Map<ClassInfo, Integer> originalLayerIndex,
+            Map<ClassInfo, ClassBox> boxMap,
+            List<PackageGroupBox> packageGroups,
             List<ClassRelation> relations) {
 
-        // Per-class → slot key lookup.
-        Map<ClassInfo, String> classToSlot = new HashMap<>();
-        for (var entry : slotMembers.entrySet()) {
-            for (var info : entry.getValue()) {
-                classToSlot.put(info, entry.getKey());
-            }
+        boolean hasRect = !node.localLabel.isEmpty();
+        int contentX = x + (hasRect ? GROUP_PADDING_LEFT : 0);
+        int contentY = y + (hasRect ? GROUP_PADDING_TOP : 0);
+
+        int innerMaxWidth = 0;
+        int innerCurrentY = contentY;
+        int blockCount = 0;
+
+        if (!node.directClasses.isEmpty()) {
+            var dims = layoutSingleSlot(
+                node.directClasses, originalLayerIndex, boxMap, contentX, innerCurrentY);
+            innerMaxWidth = Math.max(innerMaxWidth, dims.width());
+            innerCurrentY += dims.height();
+            blockCount++;
         }
 
-        boolean hasRoot = slotMembers.containsKey("");
-        var nonRoot = slotMembers.keySet().stream()
-            .filter(k -> !k.isEmpty())
-            .sorted()
-            .collect(Collectors.toCollection(ArrayList::new));
+        for (var child : orderChildrenByBarycenter(node, relations)) {
+            if (blockCount > 0) innerCurrentY += packageGap;
+            var childDims = layoutPackageNode(
+                child, contentX, innerCurrentY,
+                originalLayerIndex, boxMap, packageGroups, relations);
+            innerMaxWidth = Math.max(innerMaxWidth, childDims.width());
+            innerCurrentY += childDims.height();
+            blockCount++;
+        }
 
-        // Initial index map: root = 0 (if present), then non-root in alphabetical order.
-        Map<String, Integer> idx = new HashMap<>();
-        int next = 0;
-        if (hasRoot) idx.put("", next++);
-        for (var k : nonRoot) idx.put(k, next++);
+        int innerHeight = innerCurrentY - contentY;
+        int totalWidth = innerMaxWidth + (hasRect ? GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT : 0);
+        int totalHeight = innerHeight + (hasRect ? GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM : 0);
 
-        // Single-pass barycenter.
-        Map<String, Double> bary = new HashMap<>();
-        for (var key : nonRoot) {
+        if (hasRect) {
+            packageGroups.add(new PackageGroupBox(
+                node.localLabel, x, y, totalWidth, totalHeight));
+        }
+
+        return new SlotDimensions(totalWidth, totalHeight);
+    }
+
+    /**
+     * 子ノードの順序を単一パス重心法で決定。子サブツリー内のクラスを位置として扱い、
+     * クロスサブツリー relation で繋がる兄弟側のインデックス平均で並べ替える。
+     */
+    private List<PackageNode> orderChildrenByBarycenter(
+            PackageNode parent, List<ClassRelation> relations) {
+        var children = new ArrayList<>(parent.children.values());
+        if (children.size() <= 1) return children;
+        children.sort(Comparator.comparing(c -> c.localLabel));
+
+        Map<ClassInfo, Integer> classToChildIdx = new HashMap<>();
+        for (int i = 0; i < children.size(); i++) {
+            collectDescendantClasses(children.get(i), classToChildIdx, i);
+        }
+
+        Map<Integer, Double> bary = new HashMap<>();
+        for (int i = 0; i < children.size(); i++) {
             double sum = 0;
             int count = 0;
             for (var rel : relations) {
-                var srcSlot = classToSlot.get(rel.sourceClassInfo());
-                var tgtSlot = classToSlot.get(rel.targetClassInfo());
-                if (key.equals(srcSlot) && tgtSlot != null && !key.equals(tgtSlot)) {
-                    sum += idx.get(tgtSlot);
+                var srcIdx = classToChildIdx.get(rel.sourceClassInfo());
+                var tgtIdx = classToChildIdx.get(rel.targetClassInfo());
+                if (srcIdx == null || tgtIdx == null) continue;
+                if (srcIdx == i && tgtIdx != i) {
+                    sum += tgtIdx;
                     count++;
-                } else if (key.equals(tgtSlot) && srcSlot != null && !key.equals(srcSlot)) {
-                    sum += idx.get(srcSlot);
+                } else if (tgtIdx == i && srcIdx != i) {
+                    sum += srcIdx;
                     count++;
                 }
             }
-            bary.put(key, count > 0 ? sum / count : (double) idx.get(key));
+            bary.put(i, count > 0 ? sum / count : (double) i);
         }
 
-        // Stable sort non-root by barycenter; ties preserve alphabetical (initial) order.
-        nonRoot.sort((a, b) -> {
+        var indices = new ArrayList<Integer>();
+        for (int i = 0; i < children.size(); i++) indices.add(i);
+        indices.sort((a, b) -> {
             int cmp = Double.compare(bary.get(a), bary.get(b));
-            if (cmp != 0) return cmp;
-            return Integer.compare(idx.get(a), idx.get(b));
+            return cmp != 0 ? cmp : Integer.compare(a, b);
         });
+        var sorted = new ArrayList<PackageNode>(children.size());
+        for (var i : indices) sorted.add(children.get(i));
+        return sorted;
+    }
 
-        var result = new ArrayList<String>();
-        if (hasRoot) result.add("");
-        result.addAll(nonRoot);
-        return result;
+    private void collectDescendantClasses(
+            PackageNode node, Map<ClassInfo, Integer> map, int idx) {
+        for (var c : node.directClasses) map.put(c, idx);
+        for (var child : node.children.values()) {
+            collectDescendantClasses(child, map, idx);
+        }
     }
 
     private record SlotDimensions(int width, int height) {}
-
-    private record SlotPlacement(
-        String key,
-        int initialX,
-        int width,
-        List<ClassInfo> members,
-        int boxIndex
-    ) {}
-
-    /**
-     * 各スロットの水平シフト量を単一パス重心法で算出する。
-     *
-     * <p>各スロットの目標中心 X = クロススロット relation で繋がる相手側スロットの初期中心 X の平均。
-     * シフト = max(0, 目標中心 - 現在中心)。非負クランプにより右ドリフトと発散を防止する。
-     */
-    private Map<String, Integer> computeHorizontalShifts(
-            List<SlotPlacement> slotPlacements,
-            Map<String, List<ClassInfo>> slotMembers,
-            List<ClassRelation> relations) {
-
-        Map<ClassInfo, String> classToSlot = new HashMap<>();
-        for (var entry : slotMembers.entrySet()) {
-            for (var info : entry.getValue()) {
-                classToSlot.put(info, entry.getKey());
-            }
-        }
-
-        Map<String, Double> centers = new HashMap<>();
-        for (var sp : slotPlacements) {
-            centers.put(sp.key(), sp.initialX() + sp.width() / 2.0);
-        }
-
-        Map<String, Integer> shifts = new HashMap<>();
-        for (var sp : slotPlacements) {
-            var key = sp.key();
-            double sum = 0;
-            int count = 0;
-            for (var rel : relations) {
-                var srcSlot = classToSlot.get(rel.sourceClassInfo());
-                var tgtSlot = classToSlot.get(rel.targetClassInfo());
-                if (key.equals(srcSlot) && tgtSlot != null && !key.equals(tgtSlot)) {
-                    sum += centers.get(tgtSlot);
-                    count++;
-                } else if (key.equals(tgtSlot) && srcSlot != null && !key.equals(srcSlot)) {
-                    sum += centers.get(srcSlot);
-                    count++;
-                }
-            }
-            if (count > 0) {
-                int shift = (int) Math.round(sum / count - centers.get(key));
-                shifts.put(key, Math.max(0, shift));
-            } else {
-                shifts.put(key, 0);
-            }
-        }
-        return shifts;
-    }
-
-    private void applySlotShifts(
-            List<SlotPlacement> slotPlacements,
-            Map<String, Integer> shifts,
-            Map<ClassInfo, ClassBox> boxMap,
-            List<PackageGroupBox> packageGroups) {
-        for (var sp : slotPlacements) {
-            int shift = shifts.get(sp.key());
-            if (shift == 0) continue;
-            for (var info : sp.members()) {
-                var box = boxMap.get(info);
-                box.setPosition(box.x() + shift, box.y());
-            }
-            if (sp.boxIndex() >= 0) {
-                var oldBox = packageGroups.get(sp.boxIndex());
-                packageGroups.set(sp.boxIndex(), new PackageGroupBox(
-                    oldBox.label(),
-                    oldBox.x() + shift,
-                    oldBox.y(),
-                    oldBox.width(),
-                    oldBox.height()
-                ));
-            }
-        }
-    }
-
-    private String slotKeyFor(ClassInfo info) {
-        if (info.packageName().equals(rootPackageForGrouping)) return "";
-        if (info.packageName().startsWith(rootPackageForGrouping + ".")) {
-            return info.packageName().substring(rootPackageForGrouping.length() + 1);
-        }
-        // Defensive: package outside root → use full package name as key.
-        return info.packageName();
-    }
 
     /**
      * 1スロットを縦配置し、配置後のスロット幅・高さを返す。

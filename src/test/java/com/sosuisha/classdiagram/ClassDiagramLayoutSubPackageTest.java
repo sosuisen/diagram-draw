@@ -105,7 +105,10 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
-    void multiLevelSubPackageLabelUsesFullRelativeName() {
+    void nestedSubPackageProducesNestedRectanglesWithLocalLabels() {
+        // service.impl.SvcImpl REALIZES service.Svc.
+        // Tree: root → service (with Svc) → impl (with SvcImpl).
+        // Two PackageGroupBoxes: outer "service" and inner "impl" (local segments, not full path).
         var iface = ci(ROOT + ".service", "Svc");
         var impl  = ci(ROOT + ".service.impl", "SvcImpl");
         var rels = List.of(
@@ -116,8 +119,19 @@ class ClassDiagramLayoutSubPackageTest {
             .layout(layers, rels);
 
         var labels = result.packageGroups().stream().map(PackageGroupBox::label).toList();
-        assertTrue(labels.contains("service"));
-        assertTrue(labels.contains("service.impl"));
+        assertTrue(labels.contains("service"), "outer 'service' rectangle expected");
+        assertTrue(labels.contains("impl"), "inner 'impl' rectangle expected (local segment, not full path)");
+
+        var service = result.packageGroups().stream()
+            .filter(p -> p.label().equals("service")).findFirst().orElseThrow();
+        var implBox = result.packageGroups().stream()
+            .filter(p -> p.label().equals("impl")).findFirst().orElseThrow();
+        // impl rectangle must be visually nested inside service rectangle.
+        assertTrue(implBox.x() >= service.x() && implBox.y() >= service.y(),
+            "impl top-left must be inside service");
+        assertTrue(implBox.x() + implBox.width() <= service.x() + service.width()
+            && implBox.y() + implBox.height() <= service.y() + service.height(),
+            "impl bottom-right must be inside service");
     }
 
     @Test
@@ -150,28 +164,6 @@ class ClassDiagramLayoutSubPackageTest {
         boolean mIsOutsideVertically =
             (boxM.y() + boxM.height() <= serviceGroup.y()) || (boxM.y() >= serviceGroup.y() + serviceGroup.height());
         assertTrue(mIsOutsideVertically, "M must be vertically outside the service group rectangle");
-    }
-
-    @Test
-    void horizontalShiftAlignsNarrowSlotCenterToWideNeighbor() {
-        // alpha has a short-name class (width = MIN_WIDTH = 100).
-        // beta has a long-name class (wider than MIN_WIDTH).
-        // alpha → beta cross-slot relation. Horizontal barycenter should shift alpha right
-        // so its slot center aligns with beta's center.
-        var alphaShort = ci(ROOT + ".alpha", "S");
-        var betaLong   = ci(ROOT + ".beta",  "VeryLongClassName");
-        var rels = List.of(rel(alphaShort, betaLong));
-        var layers = new ClassRelationSorter().sort(rels);
-        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
-            .enableSubPackageGrouping(ROOT, 30)
-            .layout(layers, rels);
-
-        var alphaBox = result.boxes().stream().filter(b -> b.name().equals("S")).findFirst().orElseThrow();
-        var betaBox  = result.boxes().stream().filter(b -> b.name().equals("VeryLongClassName")).findFirst().orElseThrow();
-        int alphaCenter = alphaBox.x() + alphaBox.width() / 2;
-        int betaCenter  = betaBox.x() + betaBox.width() / 2;
-        assertTrue(Math.abs(alphaCenter - betaCenter) <= 1,
-            "alpha center (" + alphaCenter + ") should align with beta center (" + betaCenter + ") after horizontal shift");
     }
 
     @Test

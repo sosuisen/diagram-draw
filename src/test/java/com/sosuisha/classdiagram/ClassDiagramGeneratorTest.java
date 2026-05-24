@@ -71,4 +71,16 @@ class ClassDiagramGeneratorTest {
         assertTrue(svg.contains("stroke-dasharray"),
             "DEPENDENCY arrow must use a dashed line");
     }
+
+    @Test
+    void enableSubPackageGroupingThrowsForNegativeGap() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new ClassDiagramGenerator(20, 40, 20, 20, 60).enableSubPackageGrouping(-1));
+    }
+
+    @Test
+    void enableSubPackageGroupingReturnsSelf() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.enableSubPackageGrouping(30));
+    }
 }

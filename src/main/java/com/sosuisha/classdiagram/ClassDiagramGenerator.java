@@ -20,6 +20,7 @@ public class ClassDiagramGenerator {
     private final int canvasPaddingY;
     private final int groupGap;
     private String fontFamily = null;
+    private int packageGapForGrouping = -1; // -1 = disabled
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -53,6 +54,21 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * サブパッケージグルーピングを有効化する。
+     *
+     * @param packageGap サブパッケージスロット間の水平隙間（px、0以上）
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws IllegalArgumentException packageGapが0未満の場合
+     */
+    public ClassDiagramGenerator enableSubPackageGrouping(int packageGap) {
+        if (packageGap < 0) {
+            throw new IllegalArgumentException("packageGap must be >= 0: " + packageGap);
+        }
+        this.packageGapForGrouping = packageGap;
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -74,10 +90,14 @@ public class ClassDiagramGenerator {
 
         new ConnectedComponentSplitter().split(relations);
         var layers = new ClassRelationSorter().sort(relations);
-        var result = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY, groupGap)
-                         .layout(layers, relations);
+        var layoutEngine = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY, groupGap);
+        if (packageGapForGrouping >= 0) {
+            layoutEngine.enableSubPackageGrouping(packageName, packageGapForGrouping);
+        }
+        var result = layoutEngine.layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
         if (fontFamily != null) builder.fontFamily(fontFamily);
+        result.packageGroups().forEach(builder::add);
         result.boxes().forEach(builder::add);
         result.dependencies().forEach(builder::add);
         return builder.build();

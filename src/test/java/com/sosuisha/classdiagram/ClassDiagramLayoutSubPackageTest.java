@@ -47,4 +47,38 @@ class ClassDiagramLayoutSubPackageTest {
         var result = new ClassDiagramLayout(20, 40, 20, 20, 60).layout(layers, rels);
         assertTrue(result.packageGroups().isEmpty());
     }
+
+    @Test
+    void singleSubPackageProducesOnePackageGroupBoxWithRelativeLabel() {
+        // Both classes are in com.example.service → one slot, label "service".
+        var a = ci(ROOT + ".service", "A");
+        var b = ci(ROOT + ".service", "B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        assertEquals(1, result.packageGroups().size());
+        assertEquals("service", result.packageGroups().get(0).label());
+    }
+
+    @Test
+    void packageGroupBoxEnclosesAllItsMembers() {
+        var a = ci(ROOT + ".service", "A");
+        var b = ci(ROOT + ".service", "B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var pg = result.packageGroups().get(0);
+        for (var box : result.boxes()) {
+            assertTrue(box.x() >= pg.x(), "box left inside group");
+            assertTrue(box.y() >= pg.y(), "box top inside group");
+            assertTrue(box.x() + box.width() <= pg.x() + pg.width(), "box right inside group");
+            assertTrue(box.y() + box.height() <= pg.y() + pg.height(), "box bottom inside group");
+        }
+    }
 }

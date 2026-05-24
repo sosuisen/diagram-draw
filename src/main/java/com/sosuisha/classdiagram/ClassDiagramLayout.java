@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +24,11 @@ import java.util.stream.Collectors;
 public class ClassDiagramLayout {
 
     private static final int MAX_CROSSING_PASSES = 12;
+
+    private static final int GROUP_PADDING_LEFT = 15;
+    private static final int GROUP_PADDING_RIGHT = 15;
+    private static final int GROUP_PADDING_TOP = 25;
+    private static final int GROUP_PADDING_BOTTOM = 10;
 
     private final int horizontalGap;
     private final int verticalGap;
@@ -219,9 +225,29 @@ public class ClassDiagramLayout {
             }
         }
 
+        // Step 9: optional sub-package grouping — rebuild positions per (groupIndex, packageName) slot.
+        var packageGroups = new ArrayList<PackageGroupBox>();
+        if (rootPackageForGrouping != null) {
+            packageGroups.addAll(applySubPackageGrouping(orderedLayers, relations, boxMap));
+            // Recompute canvas size after re-positioning.
+            int maxRight = 0;
+            int maxBottom = 0;
+            for (var box : boxMap.values()) {
+                maxRight = Math.max(maxRight, box.x() + box.width());
+                maxBottom = Math.max(maxBottom, box.y() + box.height());
+            }
+            for (var pg : packageGroups) {
+                maxRight = Math.max(maxRight, pg.x() + pg.width());
+                maxBottom = Math.max(maxBottom, pg.y() + pg.height());
+            }
+            canvasWidth = maxRight + canvasPaddingX;
+            canvasHeight = maxBottom + canvasPaddingY;
+        }
+
         return new LayoutResult(
             List.copyOf(boxMap.values()),
             List.copyOf(dependencies),
+            List.copyOf(packageGroups),
             canvasWidth,
             canvasHeight
         );
@@ -340,6 +366,131 @@ public class ClassDiagramLayout {
             return true;
         }
         return false;
+    }
+
+    private List<PackageGroupBox> applySubPackageGrouping(
+            List<List<ClassInfo>> orderedLayers,
+            List<ClassRelation> relations,
+            Map<ClassInfo, ClassBox> boxMap) {
+
+        // Build originalLayerIndex per ClassInfo (independent of groupIndex).
+        Map<ClassInfo, Integer> originalLayerIndex = new HashMap<>();
+        for (int i = 0; i < orderedLayers.size(); i++) {
+            for (var info : orderedLayers.get(i)) {
+                originalLayerIndex.put(info, i);
+            }
+        }
+
+        // Group classes by groupIndex (preserve insertion order).
+        Map<Integer, List<ClassInfo>> byGroup = new LinkedHashMap<>();
+        for (var layer : orderedLayers) {
+            for (var info : layer) {
+                byGroup.computeIfAbsent(info.groupIndex(), k -> new ArrayList<>()).add(info);
+            }
+        }
+
+        var result = new ArrayList<PackageGroupBox>();
+        int currentGroupX = canvasPaddingX;
+
+        for (var groupEntry : byGroup.entrySet()) {
+            var members = groupEntry.getValue();
+
+            // Partition members by slot key ("" for root, relative pkg name otherwise).
+            Map<String, List<ClassInfo>> slotMembers = new LinkedHashMap<>();
+            for (var info : members) {
+                slotMembers.computeIfAbsent(slotKeyFor(info), k -> new ArrayList<>()).add(info);
+            }
+
+            // Slot ordering: root first, then alphabetical. (Task 9 will replace this with barycenter.)
+            var slotOrder = new ArrayList<String>();
+            if (slotMembers.containsKey("")) slotOrder.add("");
+            slotMembers.keySet().stream()
+                .filter(k -> !k.isEmpty())
+                .sorted()
+                .forEach(slotOrder::add);
+
+            int slotStartX = currentGroupX;
+            for (var key : slotOrder) {
+                var slot = slotMembers.get(key);
+                var dims = layoutSingleSlot(slot, originalLayerIndex, boxMap, slotStartX, canvasPaddingY);
+                if (!key.isEmpty()) {
+                    result.add(new PackageGroupBox(
+                        key,
+                        slotStartX - GROUP_PADDING_LEFT,
+                        canvasPaddingY - GROUP_PADDING_TOP,
+                        dims[0] + GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT,
+                        dims[1] + GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM
+                    ));
+                }
+                slotStartX += dims[0] + (key.isEmpty() ? 0 : GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT) + packageGap;
+            }
+
+            currentGroupX = slotStartX - packageGap + groupGap;
+        }
+
+        return result;
+    }
+
+    private String slotKeyFor(ClassInfo info) {
+        if (info.packageName().equals(rootPackageForGrouping)) return "";
+        if (info.packageName().startsWith(rootPackageForGrouping + ".")) {
+            return info.packageName().substring(rootPackageForGrouping.length() + 1);
+        }
+        // Defensive: package outside root → use full package name as key.
+        return info.packageName();
+    }
+
+    /**
+     * 1スロットを縦配置し、配置後のスロット幅・高さを返す。
+     *
+     * @return {{@code width}, {@code height}}
+     */
+    private int[] layoutSingleSlot(
+            List<ClassInfo> members,
+            Map<ClassInfo, Integer> originalLayerIndex,
+            Map<ClassInfo, ClassBox> boxMap,
+            int startX, int startY) {
+        // Group by original layer index, sorted ascending.
+        var byLayer = new TreeMap<Integer, List<ClassInfo>>();
+        for (var info : members) {
+            byLayer.computeIfAbsent(originalLayerIndex.get(info), k -> new ArrayList<>()).add(info);
+        }
+
+        // Compute each row width and the max width (= slot width).
+        var rowWidths = new ArrayList<Integer>();
+        var rowMaxHeights = new ArrayList<Integer>();
+        int slotWidth = 0;
+        for (var rowMembers : byLayer.values()) {
+            int w = 0;
+            int h = 0;
+            for (var info : rowMembers) {
+                var b = boxMap.get(info);
+                w += b.width();
+                h = Math.max(h, b.height());
+            }
+            if (rowMembers.size() > 1) w += (rowMembers.size() - 1) * horizontalGap;
+            rowWidths.add(w);
+            rowMaxHeights.add(h);
+            slotWidth = Math.max(slotWidth, w);
+        }
+
+        // Place each row centered within the slot width.
+        int currentY = startY;
+        int rowIdx = 0;
+        for (var rowMembers : byLayer.values()) {
+            int rowStartX = startX + (slotWidth - rowWidths.get(rowIdx)) / 2;
+            int x = rowStartX;
+            for (var info : rowMembers) {
+                var b = boxMap.get(info);
+                b.setPosition(x, currentY);
+                x += b.width() + horizontalGap;
+            }
+            currentY += rowMaxHeights.get(rowIdx) + verticalGap;
+            rowIdx++;
+        }
+
+        int slotHeight = (currentY - startY) - (byLayer.isEmpty() ? 0 : verticalGap);
+        return new int[] { slotWidth, slotHeight };
     }
 
     private static Map<ClassInfo, Set<ClassInfo>> buildImplToIfaceInfosMap(

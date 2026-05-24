@@ -121,6 +121,38 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void sameSubPackageClassesInNonContiguousLayersAreEnclosedTogether() {
+        // service.A → other.M → service.B
+        // Original Sugiyama layers: [A], [M], [B] (3 layers vertically)
+        // With sub-package slots: A and B (both "service") stack in one slot vertically;
+        // M lives in its own "other" slot horizontally separated.
+        var a = ci(ROOT + ".service", "A");
+        var m = ci(ROOT + ".other",   "M");
+        var b = ci(ROOT + ".service", "B");
+        var rels = List.of(rel(a, m), rel(m, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var boxA = result.boxes().stream().filter(x -> x.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(x -> x.name().equals("B")).findFirst().orElseThrow();
+        var boxM = result.boxes().stream().filter(x -> x.name().equals("M")).findFirst().orElseThrow();
+
+        var serviceGroup = result.packageGroups().stream()
+            .filter(pg -> pg.label().equals("service")).findFirst().orElseThrow();
+
+        assertTrue(boxA.x() >= serviceGroup.x() && boxA.x() + boxA.width() <= serviceGroup.x() + serviceGroup.width());
+        assertTrue(boxB.x() >= serviceGroup.x() && boxB.x() + boxB.width() <= serviceGroup.x() + serviceGroup.width());
+        assertTrue(boxA.y() >= serviceGroup.y() && boxA.y() + boxA.height() <= serviceGroup.y() + serviceGroup.height());
+        assertTrue(boxB.y() >= serviceGroup.y() && boxB.y() + boxB.height() <= serviceGroup.y() + serviceGroup.height());
+
+        boolean mIsOutsideHorizontally =
+            (boxM.x() + boxM.width() <= serviceGroup.x()) || (boxM.x() >= serviceGroup.x() + serviceGroup.width());
+        assertTrue(mIsOutsideHorizontally, "M must be horizontally outside the service group rectangle");
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

@@ -42,6 +42,7 @@ public class ClassDiagramLayout {
     private String interfaceFillColor = "#BDFFDE";
     private String packageFillColor = "#f0f0f0";
     private boolean showDetails = false;
+    private boolean picturesque = false;
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
@@ -132,6 +133,17 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * 装飾的な描画表現を有効または無効にする。
+     *
+     * @param picturesque 有効にする場合は {@code true}
+     * @return このレイアウト自身（メソッドチェーン用）
+     */
+    public ClassDiagramLayout picturesque(boolean picturesque) {
+        this.picturesque = picturesque;
+        return this;
+    }
+
+    /**
      * 16進カラー文字列を階層深度に応じて暗化する。深度 1 は基準色をそのまま返す。
      */
     private static String darkenForDepth(String hex, int depth) {
@@ -169,6 +181,7 @@ public class ClassDiagramLayout {
                 if (showDetails) {
                     box.showDetails();
                 }
+                box.picturesque(picturesque);
                 box.setFillColor(info.stereotype() == ClassStereotype.INTERFACE
                     ? interfaceFillColor : classFillColor);
                 boxMap.put(info, box);
@@ -607,7 +620,7 @@ public class ClassDiagramLayout {
         if (hasRect) {
             packageGroups.add(new PackageGroupBox(
                 node.localLabel, x, y, totalWidth, totalHeight,
-                darkenForDepth(packageFillColor, depth)));
+                darkenForDepth(packageFillColor, depth), picturesque));
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
@@ -640,7 +653,7 @@ public class ClassDiagramLayout {
             var old = packageGroups.get(i);
             packageGroups.set(i, new PackageGroupBox(
                 old.label(), old.x() + dx, old.y() + dy,
-                old.width(), old.height(), old.fillColor()));
+                old.width(), old.height(), old.fillColor(), old.picturesque()));
         }
     }
 

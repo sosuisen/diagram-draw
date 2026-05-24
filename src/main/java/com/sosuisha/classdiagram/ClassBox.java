@@ -36,6 +36,7 @@ public final class ClassBox implements SvgElement {
     private int y = 0;
     private String fillColor = null;
     private boolean showDetails = false;
+    private boolean picturesque = false;
 
     /**
      * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
@@ -142,6 +143,17 @@ public final class ClassBox implements SvgElement {
     }
 
     /**
+     * 装飾的な描画表現を有効または無効にする。
+     *
+     * @param picturesque 有効にする場合は {@code true}
+     * @return このClassBox自身（メソッドチェーン用）
+     */
+    public ClassBox picturesque(boolean picturesque) {
+        this.picturesque = picturesque;
+        return this;
+    }
+
+    /**
      * コンテンツから自動計算した幅を返す。
      *
      * @return 幅（px）
@@ -187,6 +199,7 @@ public final class ClassBox implements SvgElement {
         int w = width();
         int h = height();
         var rng = createRandom();
+        var boldRng = createRandomForBold();
         double sketchMax = sketchMax();
         var content = new StringBuilder();
 
@@ -208,10 +221,10 @@ public final class ClassBox implements SvgElement {
         if (fillColor != null) {
             sb.append("<rect width=\"%d\" height=\"%d\" fill=\"%s\"/>".formatted(w, h, fillColor));
         }
-        sb.append(sketchyLine(0, 0, w, 0, rng, sketchMax));
-        sb.append(sketchyLine(w, 0, w, h, rng, sketchMax));
-        sb.append(sketchyLine(w, h, 0, h, rng, sketchMax));
-        sb.append(sketchyLine(0, h, 0, 0, rng, sketchMax));
+        sb.append(outlineLine(0, 0, w, 0, rng, boldRng, sketchMax));
+        sb.append(outlineLine(w, 0, w, h, rng, boldRng, sketchMax));
+        sb.append(outlineLine(w, h, 0, h, rng, boldRng, sketchMax));
+        sb.append(outlineLine(0, h, 0, 0, rng, boldRng, sketchMax));
         sb.append(content);
         sb.append("</g>");
         return sb.toString();
@@ -235,6 +248,24 @@ public final class ClassBox implements SvgElement {
             return new Random(Objects.hash(name));
         }
         return new Random(Objects.hash(name, stereotype, fields, methods));
+    }
+
+    private Random createRandomForBold() {
+        return new Random(Objects.hash(name + "_bold"));
+    }
+
+    private static String sketchBoldLine(int x1, int y1, int x2, int y2,
+                                         Random rng, Random boldRng, double sketchMax) {
+        return sketchyLine(x1, y1, x2, y2, rng, sketchMax)
+            + sketchyLine(x1 + 1, y1 + 1, x2 + 1, y2 + 1, boldRng, sketchMax);
+    }
+
+    private String outlineLine(int x1, int y1, int x2, int y2,
+                               Random rng, Random boldRng, double sketchMax) {
+        if (picturesque) {
+            return sketchBoldLine(x1, y1, x2, y2, rng, boldRng, sketchMax);
+        }
+        return sketchyLine(x1, y1, x2, y2, rng, sketchMax);
     }
 
     private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng, double sketchMax) {

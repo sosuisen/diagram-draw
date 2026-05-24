@@ -25,6 +25,7 @@ public class ClassDiagramGenerator {
     private String interfaceFillColor = null;
     private String packageFillColor = null;
     private boolean showDetails = false;
+    private boolean picturesque = false;
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -120,6 +121,17 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * 装飾的な描画表現を有効または無効にする。
+     *
+     * @param picturesque 有効にする場合は {@code true}
+     * @return このジェネレーター自身（メソッドチェーン用）
+     */
+    public ClassDiagramGenerator picturesque(boolean picturesque) {
+        this.picturesque = picturesque;
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -146,6 +158,7 @@ public class ClassDiagramGenerator {
             layoutEngine.enableSubPackageGrouping(packageName, packageGapForGrouping);
         }
         if (showDetails) layoutEngine.showDetails();
+        layoutEngine.picturesque(picturesque);
         if (classFillColor != null) layoutEngine.classFillColor(classFillColor);
         if (interfaceFillColor != null) layoutEngine.interfaceFillColor(interfaceFillColor);
         if (packageFillColor != null) layoutEngine.packageFillColor(packageFillColor);

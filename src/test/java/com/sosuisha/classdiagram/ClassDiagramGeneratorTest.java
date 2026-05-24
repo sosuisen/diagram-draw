@@ -101,6 +101,12 @@ class ClassDiagramGeneratorTest {
     }
 
     @Test
+    void picturesqueReturnsSelf() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.picturesque(true));
+    }
+
+    @Test
     void generateEmitsPackageGroupSvgWhenSubPackageGroupingEnabled() {
         var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
             .enableSubPackageGrouping(30)
@@ -110,6 +116,37 @@ class ClassDiagramGeneratorTest {
             "SVG should contain at least one package-group element");
         assertTrue(svg.contains("data-diagram-draw-name=\"sub\""),
             "SVG should label the 'sub' sub-package");
+    }
+
+    @Test
+    void generateEmitsPackageShadowOnlyWhenPicturesqueEnabled() {
+        var normalSvg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(30)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertFalse(normalSvg.contains("data-diagram-draw=\"package-shadow\""));
+
+        var picturesqueSvg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(30)
+            .picturesque(true)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(picturesqueSvg.contains("data-diagram-draw=\"package-shadow-solid\""));
+        assertTrue(picturesqueSvg.contains("data-diagram-draw=\"package-shadow-dashed\""));
+    }
+
+    @Test
+    void generateMakesClassBoxesBoldOnlyWhenPicturesqueEnabled() {
+        var normalSvg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertFalse(normalSvg.contains("M 1,1"));
+
+        var picturesqueSvg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .picturesque(true)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(picturesqueSvg.contains("M 1,1"));
     }
 
     @Test

@@ -16,6 +16,7 @@ public final class PackageGroupBox implements SvgElement {
     private final int width;
     private final int height;
     private final String fillColor;
+    private final boolean picturesque;
 
     /**
      * PackageGroupBoxを生成する（塗りつぶしなし）。
@@ -45,6 +46,24 @@ public final class PackageGroupBox implements SvgElement {
      * @throws IllegalArgumentException widthまたはheightが0以下の場合
      */
     public PackageGroupBox(String label, int x, int y, int width, int height, String fillColor) {
+        this(label, x, y, width, height, fillColor, false);
+    }
+
+    /**
+     * PackageGroupBoxを生成する。
+     *
+     * @param label       サブパッケージラベル
+     * @param x           左上X座標
+     * @param y           左上Y座標
+     * @param width       幅（px、正数）
+     * @param height      高さ（px、正数）
+     * @param fillColor   塗りつぶし色（{@code null} で塗りなし）
+     * @param picturesque 装飾的な影表現を描画する場合は {@code true}
+     * @throws NullPointerException     labelがnullの場合
+     * @throws IllegalArgumentException widthまたはheightが0以下の場合
+     */
+    public PackageGroupBox(String label, int x, int y, int width, int height,
+                           String fillColor, boolean picturesque) {
         Objects.requireNonNull(label, "label must not be null");
         if (width <= 0) {
             throw new IllegalArgumentException("width must be positive: " + width);
@@ -58,6 +77,7 @@ public final class PackageGroupBox implements SvgElement {
         this.width = width;
         this.height = height;
         this.fillColor = fillColor;
+        this.picturesque = picturesque;
     }
 
     /** @return サブパッケージラベル */
@@ -78,11 +98,17 @@ public final class PackageGroupBox implements SvgElement {
     /** @return 塗りつぶし色（未設定時は {@code null}） */
     public String fillColor() { return fillColor; }
 
+    /** @return 装飾的な影表現を描画する場合は {@code true} */
+    public boolean picturesque() { return picturesque; }
+
     private static final int FONT_SIZE = 12;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int LABEL_PADDING_X = 6;
     private static final int LABEL_PADDING_Y = 4;
     private static final int TAB_HEIGHT = FONT_SIZE + LABEL_PADDING_Y * 2;
+    private static final int SHADOW_LINE_COUNT = 5;
+    private static final int SHADOW_START_OFFSET = 2;
+    private static final int SHADOW_LINE_GAP = 4;
     private static final double SKETCH_MAX = 1.5;
 
     /**
@@ -118,6 +144,9 @@ public final class PackageGroupBox implements SvgElement {
         sb.append(sketchyLine(width, TAB_HEIGHT, width, height, rng));      // main right
         sb.append(sketchyLine(width, height, 0, height, rng));              // main bottom
         sb.append(sketchyLine(0, height, 0, 0, rng));                       // left (full height)
+        if (picturesque) {
+            appendCornerShadow(sb);
+        }
         // Label inside the tab.
         int textY = LABEL_PADDING_Y + FONT_SIZE * 4 / 5;
         sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\">%s</text>"
@@ -148,5 +177,29 @@ public final class PackageGroupBox implements SvgElement {
     private static String straightPath(int x1, int y1, int x2, int y2) {
         return "<path d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"black\"/>"
             .formatted(x1, y1, x2, y2);
+    }
+
+    private void appendCornerShadow(StringBuilder sb) {
+        for (int i = 0; i < SHADOW_LINE_COUNT; i++) {
+            int offset = SHADOW_START_OFFSET + i * SHADOW_LINE_GAP;
+            int x1 = width - offset;
+            int y1 = height;
+            int x2 = width;
+            int y2 = height - offset;
+            double solidRatio = 0.6 + (SHADOW_LINE_COUNT - 1 - i) * 0.1;
+            if (solidRatio >= 1.0) {
+                sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"black\"/>"
+                    .formatted(x1, y1, x2, y2));
+                continue;
+            }
+            double splitX = x1 + (x2 - x1) * solidRatio;
+            double splitY = y1 + (y2 - y1) * solidRatio;
+            sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %.1f,%.1f\" fill=\"none\" stroke=\"black\"/>"
+                .formatted(x1, y1, splitX, splitY));
+            if (solidRatio < 1.0) {
+                sb.append("<path data-diagram-draw=\"package-shadow-dashed\" d=\"M %.1f,%.1f L %d,%d\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"2,2\"/>"
+                    .formatted(splitX, splitY, x2, y2));
+            }
+        }
     }
 }

@@ -82,4 +82,25 @@ class PackageGroupBoxTest {
         assertFalse(svg.contains("fill=\"#"),
             "no colored fill rect when fillColor is null (white label background is the only fill)");
     }
+
+    @Test
+    void drawOmitsCornerShadowByDefault() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50, "#abcdef");
+        var svg = box.draw();
+        assertFalse(svg.contains("data-diagram-draw=\"package-shadow\""));
+    }
+
+    @Test
+    void drawIncludesFiveCornerShadowLinesWhenPicturesque() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50, "#abcdef", true);
+        var svg = box.draw();
+        assertEquals(5, svg.split("data-diagram-draw=\"package-shadow-solid\"", -1).length - 1);
+        assertEquals(4, svg.split("data-diagram-draw=\"package-shadow-dashed\"", -1).length - 1);
+        assertTrue(svg.contains("M 82,50 L 92.8,39.2"));
+        assertTrue(svg.contains("M 92.8,39.2 L 100,32"));
+        assertTrue(svg.contains("M 94,50 L 99.4,44.6"));
+        assertTrue(svg.contains("M 99.4,44.6 L 100,44"));
+        assertTrue(svg.contains("M 98,50 L 100,48"));
+        assertTrue(svg.contains("stroke-dasharray=\"2,2\""));
+    }
 }

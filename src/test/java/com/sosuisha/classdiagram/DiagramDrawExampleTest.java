@@ -147,6 +147,24 @@ class DiagramDrawExampleTest {
     }
 
     @Test
+    void outputSampleComExamplePicturesqueSvgFile() throws IOException {
+        var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
+                .fontFamily("HackGen")
+                .enableSubPackageGrouping(40)
+                .picturesque(true)
+                .generate(Path.of("samples/classes"), "com.example");
+
+        var outputDir = Path.of("target/svg-output");
+        Files.createDirectories(outputDir);
+        var outputFile = outputDir.resolve("sample-com-example-picturesque.svg");
+        Files.writeString(outputFile, svg);
+
+        assertTrue(Files.exists(outputFile));
+        assertTrue(svg.contains("data-diagram-draw=\"package-shadow-solid\""));
+        assertTrue(svg.contains("data-diagram-draw=\"package-shadow-dashed\""));
+    }
+
+    @Test
     void outputLongestPathReassignmentExampleSvgFile() throws IOException {
         // Controller→Service→Repository, Controller→Logger
         // Kahn:         [[Controller], [Service, Logger], [Repository]]

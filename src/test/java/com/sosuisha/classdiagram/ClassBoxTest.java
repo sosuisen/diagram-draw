@@ -73,14 +73,14 @@ class ClassBoxTest {
 
     @Test
     void drawContainsFourPathsByDefault() {
-        // 4辺（rect代替）のみ。nameOnly がデフォルトなので区切り線は描画しない。
+        // 4辺（rect代替）。nameOnly がデフォルトなので区切り線は描画しない。
         var result = new ClassBox("MyClass").draw();
         assertEquals(4, result.split("<path", -1).length - 1);
     }
 
     @Test
     void showDetailsDrawsSixPaths() {
-        // 4辺（rect代替）+ 2本の区切り線 = 6
+        // 4辺（rect代替） + 2本の区切り線 = 6
         var result = new ClassBox("MyClass").showDetails().draw();
         assertEquals(6, result.split("<path", -1).length - 1);
     }
@@ -96,6 +96,31 @@ class ClassBoxTest {
         // 各pathに Q が2つ（S字カーブ）= 4paths × 2 = 8個
         var result = new ClassBox("MyClass").draw();
         assertEquals(8, result.split(" Q ", -1).length - 1);
+    }
+
+    @Test
+    void picturesqueReturnsSelf() {
+        var box = new ClassBox("MyClass");
+        assertSame(box, box.picturesque(true));
+    }
+
+    @Test
+    void drawDoesNotIncludeOnePixelShiftedCompanionLineByDefault() {
+        var result = new ClassBox("MyClass").draw();
+        assertFalse(result.contains("M 1,1"));
+        assertFalse(result.contains("M 101,1"));
+        assertFalse(result.contains("M 101,27"));
+        assertFalse(result.contains("M 1,27"));
+    }
+
+    @Test
+    void picturesqueDrawsBoldOutlineWithOnePixelShiftedCompanionLine() {
+        var result = new ClassBox("MyClass").picturesque(true).draw();
+        assertEquals(8, result.split("<path", -1).length - 1);
+        assertTrue(result.contains("M 1,1"));
+        assertTrue(result.contains("M 101,1"));
+        assertTrue(result.contains("M 101,27"));
+        assertTrue(result.contains("M 1,27"));
     }
 
     @Test

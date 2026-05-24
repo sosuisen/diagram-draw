@@ -83,6 +83,28 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void rootPackageSlotIsPlacedLeftOfSubPackageSlots() {
+        // R (root) ← S (com.example.service). One connected component (REALIZATION).
+        var rRoot = ci(ROOT, "R");
+        var sSvc  = ci(ROOT + ".service", "S");
+        var rels = List.of(
+            new ClassRelation(sSvc, rRoot, DependencyType.REALIZATION, false));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var boxR = result.boxes().stream().filter(b -> b.name().equals("R")).findFirst().orElseThrow();
+        var boxS = result.boxes().stream().filter(b -> b.name().equals("S")).findFirst().orElseThrow();
+        assertTrue(boxR.x() < boxS.x(), "root-package class must be left of sub-package class");
+
+        assertEquals(1, result.packageGroups().size());
+        assertEquals("service", result.packageGroups().get(0).label());
+        var pg = result.packageGroups().get(0);
+        assertTrue(boxR.x() + boxR.width() <= pg.x(), "R is left of and outside the service group");
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

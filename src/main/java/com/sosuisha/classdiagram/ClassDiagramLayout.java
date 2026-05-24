@@ -443,8 +443,12 @@ public class ClassDiagramLayout {
     }
 
     /**
-     * ノードを再帰的に配置。直接クラスを上部、子ノード矩形を下部に縦積みする。
+     * ノードを再帰的に配置。直接クラスは上部、子ノード矩形は下部に 2D スカイライン詰め込みで配置する。
      * 非ルートノードは {@link PackageGroupBox} に囲まれる。
+     *
+     * <p>子ノードはまず一時座標 (0, 0) で再帰的に配置してサイズを取得し、その後スカイラインで決定した
+     * 位置に部分木全体（クラスボックスとパッケージ矩形）をシフトする。挿入順は重心ソートで決定され、
+     * 関連の深い子同士が空間的に近接配置されるよう寄与する。
      *
      * @param x ノード自身の矩形（あれば）の左上 X 座標
      * @param y ノード自身の矩形（あれば）の左上 Y 座標
@@ -462,29 +466,59 @@ public class ClassDiagramLayout {
         int contentX = x + (hasRect ? GROUP_PADDING_LEFT : 0);
         int contentY = y + (hasRect ? GROUP_PADDING_TOP : 0);
 
-        int innerMaxWidth = 0;
-        int innerCurrentY = contentY;
-        int blockCount = 0;
-
+        int directWidth = 0;
+        int directHeight = 0;
         if (!node.directClasses.isEmpty()) {
             var dims = layoutSingleSlot(
-                node.directClasses, originalLayerIndex, boxMap, contentX, innerCurrentY);
-            innerMaxWidth = Math.max(innerMaxWidth, dims.width());
-            innerCurrentY += dims.height();
-            blockCount++;
+                node.directClasses, originalLayerIndex, boxMap, contentX, contentY);
+            directWidth = dims.width();
+            directHeight = dims.height();
         }
 
-        for (var child : orderChildrenByBarycenter(node, relations)) {
-            if (blockCount > 0) innerCurrentY += packageGap;
-            var childDims = layoutPackageNode(
-                child, contentX, innerCurrentY,
-                originalLayerIndex, boxMap, packageGroups, relations);
-            innerMaxWidth = Math.max(innerMaxWidth, childDims.width());
-            innerCurrentY += childDims.height();
-            blockCount++;
+        int childrenStartY = contentY + directHeight + (directHeight > 0 ? packageGap : 0);
+        int childrenWidth = 0;
+        int childrenHeight = 0;
+
+        var orderedChildren = orderChildrenByBarycenter(node, relations);
+        if (!orderedChildren.isEmpty()) {
+            var placements = new ArrayList<ChildPlacement>();
+            for (var child : orderedChildren) {
+                int pgStartIdx = packageGroups.size();
+                var descendants = new ArrayList<ClassInfo>();
+                collectAllDescendants(child, descendants);
+                var dims = layoutPackageNode(child, 0, 0,
+                    originalLayerIndex, boxMap, packageGroups, relations);
+                placements.add(new ChildPlacement(
+                    dims.width(), dims.height(),
+                    pgStartIdx, packageGroups.size(), descendants));
+            }
+
+            long totalArea = 0;
+            int maxChildWidth = 0;
+            for (var cp : placements) {
+                totalArea += (long) cp.width() * cp.height();
+                maxChildWidth = Math.max(maxChildWidth, cp.width());
+            }
+            int targetMaxWidth = Math.max(maxChildWidth,
+                (int) Math.ceil(Math.sqrt((double) totalArea * 1.5)));
+
+            var skyline = new Skyline();
+            for (var cp : placements) {
+                int[] pos = skyline.findFit(cp.width() + packageGap, targetMaxWidth + packageGap);
+                shiftChildSubtree(cp,
+                    contentX + pos[0], childrenStartY + pos[1],
+                    boxMap, packageGroups);
+                skyline.place(pos[0], pos[1], cp.width() + packageGap, cp.height() + packageGap);
+                childrenWidth = Math.max(childrenWidth, pos[0] + cp.width());
+                childrenHeight = Math.max(childrenHeight, pos[1] + cp.height());
+            }
         }
 
-        int innerHeight = innerCurrentY - contentY;
+        int innerMaxWidth = Math.max(directWidth, childrenWidth);
+        int innerHeight = directHeight
+            + ((directHeight > 0 && childrenHeight > 0) ? packageGap : 0)
+            + childrenHeight;
+
         int totalWidth = innerMaxWidth + (hasRect ? GROUP_PADDING_LEFT + GROUP_PADDING_RIGHT : 0);
         int totalHeight = innerHeight + (hasRect ? GROUP_PADDING_TOP + GROUP_PADDING_BOTTOM : 0);
 
@@ -494,6 +528,115 @@ public class ClassDiagramLayout {
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
+    }
+
+    private record ChildPlacement(
+        int width,
+        int height,
+        int packageGroupStartIdx,
+        int packageGroupEndIdx,
+        List<ClassInfo> descendants
+    ) {}
+
+    private void collectAllDescendants(PackageNode node, List<ClassInfo> out) {
+        out.addAll(node.directClasses);
+        for (var c : node.children.values()) {
+            collectAllDescendants(c, out);
+        }
+    }
+
+    private void shiftChildSubtree(
+            ChildPlacement cp, int dx, int dy,
+            Map<ClassInfo, ClassBox> boxMap,
+            List<PackageGroupBox> packageGroups) {
+        for (var info : cp.descendants()) {
+            var box = boxMap.get(info);
+            box.setPosition(box.x() + dx, box.y() + dy);
+        }
+        for (int i = cp.packageGroupStartIdx(); i < cp.packageGroupEndIdx(); i++) {
+            var old = packageGroups.get(i);
+            packageGroups.set(i, new PackageGroupBox(
+                old.label(), old.x() + dx, old.y() + dy, old.width(), old.height()));
+        }
+    }
+
+    /**
+     * 2D スカイラインを表す可変オブジェクト。{@code (x, height)} のノットでスカイラインを表現し、
+     * 各ノットの高さは次のノットの x まで持続する。
+     */
+    private static final class Skyline {
+        private final List<int[]> knots = new ArrayList<>();
+
+        Skyline() {
+            knots.add(new int[]{0, 0});
+        }
+
+        /**
+         * 幅 {@code width} の矩形を置ける位置のうち、最も低い y を返す。
+         * 同じ y なら最も左を選ぶ（Bottom-Left fill）。
+         *
+         * @return {x, y}（見つからない場合は最大高さに積み上げる）
+         */
+        int[] findFit(int width, int maxWidth) {
+            int bestX = -1;
+            int bestY = Integer.MAX_VALUE;
+            for (int i = 0; i < knots.size(); i++) {
+                int x = knots.get(i)[0];
+                if (x + width > maxWidth) continue;
+                int maxH = knots.get(i)[1];
+                for (int j = i + 1; j < knots.size(); j++) {
+                    int kx = knots.get(j)[0];
+                    if (kx >= x + width) break;
+                    maxH = Math.max(maxH, knots.get(j)[1]);
+                }
+                if (maxH < bestY) {
+                    bestY = maxH;
+                    bestX = x;
+                }
+            }
+            if (bestX < 0) {
+                int top = 0;
+                for (var k : knots) top = Math.max(top, k[1]);
+                return new int[]{0, top};
+            }
+            return new int[]{bestX, bestY};
+        }
+
+        /**
+         * {@code [x, x+width)} の範囲を高さ {@code y+height} で占有したとマークする。
+         */
+        void place(int x, int y, int width, int height) {
+            int endX = x + width;
+            int newTop = y + height;
+            int heightAtEndX = heightAt(endX);
+            knots.removeIf(k -> k[0] >= x && k[0] < endX);
+            insertKnot(x, newTop);
+            if (!hasKnotAt(endX)) {
+                insertKnot(endX, heightAtEndX);
+            }
+        }
+
+        private int heightAt(int x) {
+            int h = 0;
+            for (var k : knots) {
+                if (k[0] > x) break;
+                h = k[1];
+            }
+            return h;
+        }
+
+        private boolean hasKnotAt(int x) {
+            for (var k : knots) {
+                if (k[0] == x) return true;
+            }
+            return false;
+        }
+
+        private void insertKnot(int x, int height) {
+            int i = 0;
+            while (i < knots.size() && knots.get(i)[0] < x) i++;
+            knots.add(i, new int[]{x, height});
+        }
     }
 
     /**

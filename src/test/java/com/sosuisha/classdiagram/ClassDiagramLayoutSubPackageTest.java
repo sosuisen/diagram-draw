@@ -105,6 +105,22 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void multiLevelSubPackageLabelUsesFullRelativeName() {
+        var iface = ci(ROOT + ".service", "Svc");
+        var impl  = ci(ROOT + ".service.impl", "SvcImpl");
+        var rels = List.of(
+            new ClassRelation(impl, iface, DependencyType.REALIZATION, false));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var labels = result.packageGroups().stream().map(PackageGroupBox::label).toList();
+        assertTrue(labels.contains("service"));
+        assertTrue(labels.contains("service.impl"));
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

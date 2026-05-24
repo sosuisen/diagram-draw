@@ -41,39 +41,19 @@ public final class PackageGroupBox implements SvgElement {
         this.height = height;
     }
 
-    /**
-     * サブパッケージラベルを返す。
-     *
-     * @return サブパッケージラベル
-     */
+    /** @return サブパッケージラベル */
     public String label() { return label; }
 
-    /**
-     * 左上X座標を返す。
-     *
-     * @return 左上X座標
-     */
+    /** @return 左上X座標 */
     public int x() { return x; }
 
-    /**
-     * 左上Y座標を返す。
-     *
-     * @return 左上Y座標
-     */
+    /** @return 左上Y座標 */
     public int y() { return y; }
 
-    /**
-     * 幅（px）を返す。
-     *
-     * @return 幅（px）
-     */
+    /** @return 幅（px） */
     public int width() { return width; }
 
-    /**
-     * 高さ（px）を返す。
-     *
-     * @return 高さ（px）
-     */
+    /** @return 高さ（px） */
     public int height() { return height; }
 
     /**

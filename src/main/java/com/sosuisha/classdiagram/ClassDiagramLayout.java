@@ -230,6 +230,9 @@ public class ClassDiagramLayout {
         var packageGroups = new ArrayList<PackageGroupBox>();
         if (rootPackageForGrouping != null) {
             packageGroups.addAll(applySubPackageGrouping(orderedLayers, relations, boxMap));
+            // Class-level barycenter: reorder classes within each row of each leaf package
+            // so that classes connected to outside-row classes are placed closer to them.
+            applyClassLevelBarycenter(boxMap, relations);
             // Recompute canvas size after re-positioning.
             int maxRight = 0;
             int maxBottom = 0;
@@ -693,6 +696,67 @@ public class ClassDiagramLayout {
     }
 
     private record SlotDimensions(int width, int height) {}
+
+    /**
+     * 同じパッケージ・同じ Sugiyama 層に属するクラス（= 同じ行）を、外部依存先のクラスの現在 X
+     * 座標の平均で並べ替え、行全体の左右端は保ったまま X 位置を再割当てする。
+     *
+     * <p>呼び出しは {@link #applySubPackageGrouping} 完了後のみ意味を持つ（クラスが配置済み
+     * であることを前提とするため）。
+     */
+    private void applyClassLevelBarycenter(
+            Map<ClassInfo, ClassBox> boxMap,
+            List<ClassRelation> relations) {
+
+        // Group classes into rows keyed by (packageName, y-coordinate).
+        // Same package + same y == same Sugiyama row.
+        Map<String, List<ClassInfo>> rows = new LinkedHashMap<>();
+        for (var info : boxMap.keySet()) {
+            var box = boxMap.get(info);
+            var key = info.packageName() + "#" + box.y();
+            rows.computeIfAbsent(key, k -> new ArrayList<>()).add(info);
+        }
+
+        for (var row : rows.values()) {
+            if (row.size() <= 1) continue;
+            var rowSet = new HashSet<>(row);
+
+            int rowLeftX = row.stream().mapToInt(c -> boxMap.get(c).x()).min().orElse(0);
+
+            Map<ClassInfo, Double> targetX = new HashMap<>();
+            for (var c : row) {
+                double sum = 0;
+                int count = 0;
+                for (var rel : relations) {
+                    ClassInfo other = null;
+                    if (rel.sourceClassInfo().equals(c)) {
+                        other = rel.targetClassInfo();
+                    } else if (rel.targetClassInfo().equals(c)) {
+                        other = rel.sourceClassInfo();
+                    }
+                    if (other == null || rowSet.contains(other)) continue;
+                    var otherBox = boxMap.get(other);
+                    if (otherBox == null) continue;
+                    sum += otherBox.x() + otherBox.width() / 2.0;
+                    count++;
+                }
+                var cBox = boxMap.get(c);
+                targetX.put(c, count > 0
+                    ? sum / count
+                    : cBox.x() + cBox.width() / 2.0);
+            }
+
+            var sorted = new ArrayList<>(row);
+            sorted.sort(Comparator.comparingDouble(targetX::get));
+
+            int x = rowLeftX;
+            for (var c : sorted) {
+                var box = boxMap.get(c);
+                box.setPosition(x, box.y());
+                x += box.width() + horizontalGap;
+            }
+        }
+    }
 
     /**
      * 1スロットを縦配置し、配置後のスロット幅・高さを返す。

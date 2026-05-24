@@ -167,6 +167,51 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void classLevelBarycenterReordersRowMembersToFollowExternalConnections() {
+        // service has 3 classes in the same Sugiyama row: A, B, C.
+        // outer.X depends on service.C only.
+        // Without class-level barycenter, the row order follows minimizeCrossings
+        // output (alphabetical-like: A, B, C → C is rightmost).
+        // outer.X is at some position; for service.C's connection to outer.X to be straightest,
+        // C should be on the side of X. The barycenter pull should keep C next to outer
+        // (it already is on the right, so this verifies the algorithm doesn't break ordering).
+        // More interesting: make outer.X depend on service.A. Without reorder: A is leftmost.
+        // After barycenter: A should be pulled to the side of outer (let's see geometry).
+        // Actually for a clean assertion we test that after barycenter,
+        // among A/B/C, the one connected to outer ends up closest in X to outer.
+        var svcA = ci(ROOT + ".service", "A");
+        var svcB = ci(ROOT + ".service", "B");
+        var svcC = ci(ROOT + ".service", "C");
+        var outerX = ci(ROOT + ".outer", "X");
+        // A connects within row; B connects to outer.X; C connects within row.
+        // So B should move toward outer.X side after the class-level barycenter pass.
+        var rels = List.of(
+            rel(svcA, svcB),
+            rel(svcB, outerX),
+            rel(svcB, svcC)
+        );
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var boxA = result.boxes().stream().filter(b -> b.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(b -> b.name().equals("B")).findFirst().orElseThrow();
+        var boxC = result.boxes().stream().filter(b -> b.name().equals("C")).findFirst().orElseThrow();
+        var boxX = result.boxes().stream().filter(b -> b.name().equals("X")).findFirst().orElseThrow();
+
+        // Only A, B, C live in the same row (same package, same Sugiyama layer).
+        // The class with the external connection to outer.X (= B) should end up closest in X
+        // to outer.X's center among the three.
+        int xCenter = boxX.x() + boxX.width() / 2;
+        int distA = Math.abs((boxA.x() + boxA.width() / 2) - xCenter);
+        int distB = Math.abs((boxB.x() + boxB.width() / 2) - xCenter);
+        int distC = Math.abs((boxC.x() + boxC.width() / 2) - xCenter);
+        assertTrue(distB <= distA, "B (externally connected) should be at least as close to X as A");
+        assertTrue(distB <= distC, "B (externally connected) should be at least as close to X as C");
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

@@ -29,6 +29,8 @@ public class ClassDiagramLayout {
     private final int canvasPaddingX;
     private final int canvasPaddingY;
     private final int groupGap;
+    private String rootPackageForGrouping = null;
+    private int packageGap = 0;
 
     /**
      * ClassDiagramLayoutを生成する。
@@ -46,6 +48,27 @@ public class ClassDiagramLayout {
         this.canvasPaddingX = canvasPaddingX;
         this.canvasPaddingY = canvasPaddingY;
         this.groupGap = groupGap;
+    }
+
+    /**
+     * サブパッケージグルーピングを有効化する。設定すると {@link #layout} が
+     * 各ConnectedComponent内を {@code (groupIndex, packageName)} ごとの水平スロットに分割し、
+     * 非ルートスロットを {@link PackageGroupBox} で囲む。未呼出時は既存レイアウトと同一出力。
+     *
+     * @param rootPackage スキャン対象パッケージ名（相対サブパッケージラベル算出に使用）
+     * @param packageGap  サブパッケージスロット間の水平隙間（px、0以上）
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException     rootPackageがnullの場合
+     * @throws IllegalArgumentException packageGapが0未満の場合
+     */
+    public ClassDiagramLayout enableSubPackageGrouping(String rootPackage, int packageGap) {
+        Objects.requireNonNull(rootPackage, "rootPackage must not be null");
+        if (packageGap < 0) {
+            throw new IllegalArgumentException("packageGap must be >= 0: " + packageGap);
+        }
+        this.rootPackageForGrouping = rootPackage;
+        this.packageGap = packageGap;
+        return this;
     }
 
     /**

@@ -53,6 +53,19 @@ class ClassBoxTest {
     }
 
     @Test
+    void drawIncludesFillRectWhenFillColorSet() {
+        var box = new ClassBox("MyClass");
+        box.setFillColor("#FFFFBB");
+        assertTrue(box.draw().contains("fill=\"#FFFFBB\""));
+    }
+
+    @Test
+    void drawOmitsFillRectWhenFillColorNull() {
+        var box = new ClassBox("MyClass");
+        assertFalse(box.draw().contains("fill=\"#"));
+    }
+
+    @Test
     void drawContainsClassName() {
         var result = new ClassBox("MyClass").draw();
         assertTrue(result.contains("MyClass"));

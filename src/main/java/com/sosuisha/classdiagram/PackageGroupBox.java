@@ -15,9 +15,10 @@ public final class PackageGroupBox implements SvgElement {
     private final int y;
     private final int width;
     private final int height;
+    private final String fillColor;
 
     /**
-     * PackageGroupBoxを生成する。
+     * PackageGroupBoxを生成する（塗りつぶしなし）。
      *
      * @param label  サブパッケージラベル
      * @param x      左上X座標
@@ -28,6 +29,22 @@ public final class PackageGroupBox implements SvgElement {
      * @throws IllegalArgumentException widthまたはheightが0以下の場合
      */
     public PackageGroupBox(String label, int x, int y, int width, int height) {
+        this(label, x, y, width, height, null);
+    }
+
+    /**
+     * PackageGroupBoxを生成する。
+     *
+     * @param label     サブパッケージラベル
+     * @param x         左上X座標
+     * @param y         左上Y座標
+     * @param width     幅（px、正数）
+     * @param height    高さ（px、正数）
+     * @param fillColor 塗りつぶし色（{@code null} で塗りなし）
+     * @throws NullPointerException     labelがnullの場合
+     * @throws IllegalArgumentException widthまたはheightが0以下の場合
+     */
+    public PackageGroupBox(String label, int x, int y, int width, int height, String fillColor) {
         Objects.requireNonNull(label, "label must not be null");
         if (width <= 0) {
             throw new IllegalArgumentException("width must be positive: " + width);
@@ -40,6 +57,7 @@ public final class PackageGroupBox implements SvgElement {
         this.y = y;
         this.width = width;
         this.height = height;
+        this.fillColor = fillColor;
     }
 
     /** @return サブパッケージラベル */
@@ -56,6 +74,9 @@ public final class PackageGroupBox implements SvgElement {
 
     /** @return 高さ（px） */
     public int height() { return height; }
+
+    /** @return 塗りつぶし色（未設定時は {@code null}） */
+    public String fillColor() { return fillColor; }
 
     private static final int FONT_SIZE = 12;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
@@ -74,6 +95,9 @@ public final class PackageGroupBox implements SvgElement {
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"package-group\" data-diagram-draw-name=\"%s\" transform=\"translate(%d,%d)\">"
             .formatted(label, x, y));
+        if (fillColor != null) {
+            sb.append("<rect width=\"%d\" height=\"%d\" fill=\"%s\"/>".formatted(width, height, fillColor));
+        }
         // 4 sketchy edges (top, right, bottom, left)
         sb.append(sketchyLine(0, 0, width, 0, rng));
         sb.append(sketchyLine(width, 0, width, height, rng));

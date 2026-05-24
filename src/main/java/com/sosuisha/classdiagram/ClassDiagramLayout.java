@@ -37,6 +37,10 @@ public class ClassDiagramLayout {
     private final int groupGap;
     private String rootPackageForGrouping = null;
     private int packageGap = 0;
+    private String classFillColor = "#FFFFBB";
+    private String interfaceFillColor = "#BDFFDE";
+    private String packageFillColor = "#f0f0f0";
+    private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
      * ClassDiagramLayoutを生成する。
@@ -79,6 +83,57 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * クラス（非インタフェース）矩形の塗りつぶし色を設定する。
+     *
+     * @param hex SVG 互換色文字列（例: {@code "#FFFFBB"}）
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout classFillColor(String hex) {
+        this.classFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * インタフェース矩形の塗りつぶし色を設定する。
+     *
+     * @param hex SVG 互換色文字列（例: {@code "#BDFFDE"}）
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout interfaceFillColor(String hex) {
+        this.interfaceFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * パッケージ矩形の基準塗りつぶし色を設定する。実際の塗り色は階層が深くなるほど暗くなる
+     * （階層 1 では基準色、以降は階層数に応じて係数 0.9 を累乗して暗化）。
+     *
+     * @param hex SVG 互換色文字列（例: {@code "#f0f0f0"}）
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout packageFillColor(String hex) {
+        this.packageFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * 16進カラー文字列を階層深度に応じて暗化する。深度 1 は基準色をそのまま返す。
+     */
+    private static String darkenForDepth(String hex, int depth) {
+        int r = Integer.parseInt(hex.substring(1, 3), 16);
+        int g = Integer.parseInt(hex.substring(3, 5), 16);
+        int b = Integer.parseInt(hex.substring(5, 7), 16);
+        double factor = Math.pow(PACKAGE_DEPTH_DARKEN_FACTOR, Math.max(0, depth - 1));
+        int rr = Math.max(0, Math.min(255, (int) Math.round(r * factor)));
+        int gg = Math.max(0, Math.min(255, (int) Math.round(g * factor)));
+        int bb = Math.max(0, Math.min(255, (int) Math.round(b * factor)));
+        return String.format("#%02x%02x%02x", rr, gg, bb);
+    }
+
+    /**
      * レイヤーと関係リストからレイアウト結果を計算する。
      *
      * @param layers    ClassRelationSorterが出力したレイヤーリスト
@@ -98,7 +153,10 @@ public class ClassDiagramLayout {
         Map<ClassInfo, ClassBox> boxMap = new LinkedHashMap<>();
         for (var layer : layers) {
             for (var info : layer) {
-                boxMap.put(info, new ClassBox(info.simpleName(), info.stereotype()));
+                var box = new ClassBox(info.simpleName(), info.stereotype());
+                box.setFillColor(info.stereotype() == ClassStereotype.INTERFACE
+                    ? interfaceFillColor : classFillColor);
+                boxMap.put(info, box);
             }
         }
 
@@ -401,7 +459,7 @@ public class ClassDiagramLayout {
 
         for (var groupEntry : byGroup.entrySet()) {
             var ccRoot = buildPackageTree(groupEntry.getValue());
-            var dims = layoutPackageNode(ccRoot, currentGroupX, slotStartY,
+            var dims = layoutPackageNode(ccRoot, currentGroupX, slotStartY, 0,
                 originalLayerIndex, boxMap, result, relations);
             currentGroupX += dims.width() + groupGap;
         }
@@ -454,13 +512,14 @@ public class ClassDiagramLayout {
      * 位置に部分木全体（クラスボックスとパッケージ矩形）をシフトする。挿入順は重心ソートで決定され、
      * 関連の深い子同士が空間的に近接配置されるよう寄与する。
      *
-     * @param x ノード自身の矩形（あれば）の左上 X 座標
-     * @param y ノード自身の矩形（あれば）の左上 Y 座標
+     * @param x     ノード自身の矩形（あれば）の左上 X 座標
+     * @param y     ノード自身の矩形（あれば）の左上 Y 座標
+     * @param depth このノードの矩形のネスト階層（0 = CC ルート、1 = 最外パッケージ矩形、以降深くなるほど増加）
      * @return ノード全体（矩形を含む）の幅・高さ
      */
     private SlotDimensions layoutPackageNode(
             PackageNode node,
-            int x, int y,
+            int x, int y, int depth,
             Map<ClassInfo, Integer> originalLayerIndex,
             Map<ClassInfo, ClassBox> boxMap,
             List<PackageGroupBox> packageGroups,
@@ -490,7 +549,7 @@ public class ClassDiagramLayout {
                 int pgStartIdx = packageGroups.size();
                 var descendants = new ArrayList<ClassInfo>();
                 collectAllDescendants(child, descendants);
-                var dims = layoutPackageNode(child, 0, 0,
+                var dims = layoutPackageNode(child, 0, 0, depth + 1,
                     originalLayerIndex, boxMap, packageGroups, relations);
                 placements.add(new ChildPlacement(
                     dims.width(), dims.height(),
@@ -528,7 +587,8 @@ public class ClassDiagramLayout {
 
         if (hasRect) {
             packageGroups.add(new PackageGroupBox(
-                node.localLabel, x, y, totalWidth, totalHeight));
+                node.localLabel, x, y, totalWidth, totalHeight,
+                darkenForDepth(packageFillColor, depth)));
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
@@ -560,7 +620,8 @@ public class ClassDiagramLayout {
         for (int i = cp.packageGroupStartIdx(); i < cp.packageGroupEndIdx(); i++) {
             var old = packageGroups.get(i);
             packageGroups.set(i, new PackageGroupBox(
-                old.label(), old.x() + dx, old.y() + dy, old.width(), old.height()));
+                old.label(), old.x() + dx, old.y() + dy,
+                old.width(), old.height(), old.fillColor()));
         }
     }
 

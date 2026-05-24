@@ -65,4 +65,20 @@ class PackageGroupBoxTest {
         var box = new PackageGroupBox("p", 10, 20, 100, 50);
         assertTrue(box.draw().contains("translate(10,20)"));
     }
+
+    @Test
+    void drawIncludesFillRectWhenFillColorSet() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50, "#abcdef");
+        var svg = box.draw();
+        assertTrue(svg.contains("fill=\"#abcdef\""),
+            "fill color must appear in SVG output");
+    }
+
+    @Test
+    void drawOmitsFillRectWhenFillColorNull() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50);
+        var svg = box.draw();
+        assertFalse(svg.contains("fill=\"#"),
+            "no colored fill rect when fillColor is null (white label background is the only fill)");
+    }
 }

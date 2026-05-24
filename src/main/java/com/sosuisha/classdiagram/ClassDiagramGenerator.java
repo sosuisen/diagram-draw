@@ -21,6 +21,9 @@ public class ClassDiagramGenerator {
     private final int groupGap;
     private String fontFamily = null;
     private int packageGapForGrouping = -1; // -1 = disabled
+    private String classFillColor = null;
+    private String interfaceFillColor = null;
+    private String packageFillColor = null;
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -69,6 +72,43 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * クラス（非インタフェース）矩形の塗りつぶし色を設定する。デフォルト: {@code "#FFFFBB"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator classFillColor(String hex) {
+        this.classFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * インタフェース矩形の塗りつぶし色を設定する。デフォルト: {@code "#BDFFDE"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator interfaceFillColor(String hex) {
+        this.interfaceFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * パッケージ矩形の基準塗りつぶし色を設定する。階層が深くなるほど暗化する。
+     * デフォルト: {@code "#f0f0f0"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator packageFillColor(String hex) {
+        this.packageFillColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -94,6 +134,9 @@ public class ClassDiagramGenerator {
         if (packageGapForGrouping >= 0) {
             layoutEngine.enableSubPackageGrouping(packageName, packageGapForGrouping);
         }
+        if (classFillColor != null) layoutEngine.classFillColor(classFillColor);
+        if (interfaceFillColor != null) layoutEngine.interfaceFillColor(interfaceFillColor);
+        if (packageFillColor != null) layoutEngine.packageFillColor(packageFillColor);
         var result = layoutEngine.layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
         if (fontFamily != null) builder.fontFamily(fontFamily);

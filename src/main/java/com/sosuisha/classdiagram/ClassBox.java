@@ -32,6 +32,7 @@ public final class ClassBox implements SvgElement {
     private final List<String> methods;
     private int x = 0;
     private int y = 0;
+    private String fillColor = null;
 
     /**
      * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
@@ -116,6 +117,18 @@ public final class ClassBox implements SvgElement {
     }
 
     /**
+     * 矩形内部の塗りつぶし色を設定する。{@code null} で塗りなし（透明）。
+     *
+     * @param fillColor SVG 互換の色文字列（例: {@code "#FFFFBB"}）または {@code null}
+     */
+    public void setFillColor(String fillColor) {
+        this.fillColor = fillColor;
+    }
+
+    /** @return 塗りつぶし色（未設定時は {@code null}） */
+    public String fillColor() { return fillColor; }
+
+    /**
      * コンテンツから自動計算した幅を返す。
      *
      * @return 幅（px）
@@ -171,6 +184,9 @@ public final class ClassBox implements SvgElement {
             sb.append("<g data-diagram-draw=\"box\" data-diagram-draw-type=\"class\" data-diagram-draw-name=\"%s\" transform=\"translate(%d,%d)\">".formatted(name, x, y));
         } else {
             sb.append("<g data-diagram-draw=\"box\" data-diagram-draw-type=\"class\" data-diagram-draw-name=\"%s\">".formatted(name));
+        }
+        if (fillColor != null) {
+            sb.append("<rect width=\"%d\" height=\"%d\" fill=\"%s\"/>".formatted(w, h, fillColor));
         }
         sb.append(sketchyLine(0, 0, w, 0, rng, sketchMax));
         sb.append(sketchyLine(w, 0, w, h, rng, sketchMax));

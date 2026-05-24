@@ -167,6 +167,47 @@ class ClassDiagramLayoutSubPackageTest {
     }
 
     @Test
+    void defaultFillColorsAreAppliedWhenGroupingEnabled() {
+        // ROOT contains class C (no stereotype) and root.svc contains interface I.
+        var c = ci(ROOT, "C");
+        var i = new ClassInfo(ROOT + ".svc", "I", ClassStereotype.INTERFACE);
+        var rels = List.of(
+            new ClassRelation(c, i, DependencyType.COMPOSITION, false));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var boxC = result.boxes().stream().filter(b -> b.name().equals("C")).findFirst().orElseThrow();
+        var boxI = result.boxes().stream().filter(b -> b.name().equals("I")).findFirst().orElseThrow();
+        assertEquals("#FFFFBB", boxC.fillColor(), "default class fill is #FFFFBB");
+        assertEquals("#BDFFDE", boxI.fillColor(), "default interface fill is #BDFFDE");
+
+        var svcGroup = result.packageGroups().stream()
+            .filter(p -> p.label().equals("svc")).findFirst().orElseThrow();
+        assertEquals("#f0f0f0", svcGroup.fillColor(), "depth-1 package fill is base #f0f0f0");
+    }
+
+    @Test
+    void packageFillDarkensWithNestingDepth() {
+        // root.outer.inner.X with relations to keep them all in one CC.
+        var outer = new ClassInfo(ROOT + ".outer", "O");
+        var inner = new ClassInfo(ROOT + ".outer.inner", "I");
+        var rels = List.of(rel(outer, inner));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+
+        var outerBox = result.packageGroups().stream()
+            .filter(p -> p.label().equals("outer")).findFirst().orElseThrow();
+        var innerBox = result.packageGroups().stream()
+            .filter(p -> p.label().equals("inner")).findFirst().orElseThrow();
+        assertEquals("#f0f0f0", outerBox.fillColor(), "depth 1 = base color");
+        assertEquals("#d8d8d8", innerBox.fillColor(), "depth 2 = 0.9 × base");
+    }
+
+    @Test
     void packageGroupBoxStaysWithinCanvasBounds() {
         // Regression: with default canvasPaddingY=20 (< GROUP_PADDING_TOP=25),
         // the algorithm must clamp the package group's top so it is not negative.

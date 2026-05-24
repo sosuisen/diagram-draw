@@ -50,7 +50,7 @@ class DependencyTest {
     void drawContainsCurvePath() {
         var svg = dep(DependencyType.COMPOSITION).draw();
         assertTrue(svg.contains("<path "), "edge should be drawn as <path>");
-        assertTrue(svg.contains(" Q "), "path should use a quadratic Bezier (Q) curve command");
+        assertTrue(svg.contains(" C "), "path should use a cubic Bezier (C) curve command");
     }
 
     @Test
@@ -84,11 +84,10 @@ class DependencyTest {
 
     @Test
     void drawCurveDoesNotEndAtTargetCenter() {
-        // ターゲット中心X = 250。曲線の終点は ".. 250.0,..." 形式では現れないはず（辺上の点）
+        // ターゲット中心X = 250。曲線の終点は辺上の点なので 250.0 は座標として現れないはず。
         var result = dep(DependencyType.COMPOSITION).draw();
-        // 曲線パスの末尾は "Q cpx,cpy ex,ey"。ex=250.0 ならテスト対象が辺上にないことになる。
-        assertFalse(result.matches(".* Q [^ ]+ 250\\.0,.*"),
-            "curve should not end at target center X (250.0)");
+        assertFalse(result.contains(" 250.0,"),
+            "no curve coordinate should be at target center X (250.0)");
     }
 
     private static Dependency realizationDep() {

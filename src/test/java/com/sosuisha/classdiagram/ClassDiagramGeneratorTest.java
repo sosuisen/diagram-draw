@@ -83,4 +83,25 @@ class ClassDiagramGeneratorTest {
         var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
         assertSame(gen, gen.enableSubPackageGrouping(30));
     }
+
+    @Test
+    void generateEmitsPackageGroupSvgWhenSubPackageGroupingEnabled() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(30)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svg.contains("data-diagram-draw=\"package-group\""),
+            "SVG should contain at least one package-group element");
+        assertTrue(svg.contains("data-diagram-draw-name=\"sub\""),
+            "SVG should label the 'sub' sub-package");
+    }
+
+    @Test
+    void generateDoesNotEmitPackageGroupSvgByDefault() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertFalse(svg.contains("data-diagram-draw=\"package-group\""),
+            "SVG should NOT contain package-group when option is disabled");
+    }
 }

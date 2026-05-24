@@ -12,8 +12,8 @@ public final class Dependency implements SvgElement {
 
     private static final int DIAMOND_HALF_LEN = 10;
     private static final int DIAMOND_HALF_WIDTH = 5;
-    private static final int TRIANGLE_LEN = 20;
-    private static final int TRIANGLE_HALF_WIDTH = 8;
+    private static final int TRIANGLE_LEN = 16;
+    private static final int TRIANGLE_HALF_WIDTH = 6;
     private static final int ARROWHEAD_LEN = 10;
     private static final double ARROWHEAD_HALF_ANGLE = Math.PI / 6.0; // 30 degrees
     private static final double CURVE_OFFSET_MIN = 20.0;

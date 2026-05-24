@@ -53,12 +53,28 @@ class ClassDiagramGeneratorTest {
     }
 
     @Test
-    void generateIncludesStereotypeLabelForInterfaces() {
+    void generateIncludesStereotypeLabelForInterfacesByDefault() {
         var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
             .generate(Path.of("target/test-classes"),
                       "com.sosuisha.classdiagram.analyzer.fixture");
         assertTrue(svg.contains("«interface»"),
-            "SVG must contain «interface» stereotype label for FixtureService");
+            "nameOnly keeps interface stereotype labels while omitting members and separators");
+    }
+
+    @Test
+    void showDetailsReturnsSelf() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.showDetails());
+    }
+
+    @Test
+    void showDetailsIncludesStereotypeLabelForInterfaces() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .showDetails()
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svg.contains("«interface»"),
+            "showDetails must contain «interface» stereotype label for FixtureService");
     }
 
     @Test

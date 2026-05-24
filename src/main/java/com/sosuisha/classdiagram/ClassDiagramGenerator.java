@@ -24,6 +24,7 @@ public class ClassDiagramGenerator {
     private String classFillColor = null;
     private String interfaceFillColor = null;
     private String packageFillColor = null;
+    private boolean showDetails = false;
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -109,6 +110,16 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * クラスボックスを詳細表示にする。ステレオタイプ、フィールド、メソッド、および区切り線を描画する。
+     *
+     * @return このジェネレーター自身（メソッドチェーン用）
+     */
+    public ClassDiagramGenerator showDetails() {
+        this.showDetails = true;
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -134,6 +145,7 @@ public class ClassDiagramGenerator {
         if (packageGapForGrouping >= 0) {
             layoutEngine.enableSubPackageGrouping(packageName, packageGapForGrouping);
         }
+        if (showDetails) layoutEngine.showDetails();
         if (classFillColor != null) layoutEngine.classFillColor(classFillColor);
         if (interfaceFillColor != null) layoutEngine.interfaceFillColor(interfaceFillColor);
         if (packageFillColor != null) layoutEngine.packageFillColor(packageFillColor);

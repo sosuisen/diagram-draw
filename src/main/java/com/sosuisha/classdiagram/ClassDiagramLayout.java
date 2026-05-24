@@ -41,6 +41,7 @@ public class ClassDiagramLayout {
     private String classFillColor = "#FFFFBB";
     private String interfaceFillColor = "#BDFFDE";
     private String packageFillColor = "#f0f0f0";
+    private boolean showDetails = false;
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
@@ -121,6 +122,16 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * クラスボックスを詳細表示にする。ステレオタイプ、フィールド、メソッド、および区切り線を描画する。
+     *
+     * @return このレイアウト自身（メソッドチェーン用）
+     */
+    public ClassDiagramLayout showDetails() {
+        this.showDetails = true;
+        return this;
+    }
+
+    /**
      * 16進カラー文字列を階層深度に応じて暗化する。深度 1 は基準色をそのまま返す。
      */
     private static String darkenForDepth(String hex, int depth) {
@@ -155,6 +166,9 @@ public class ClassDiagramLayout {
         for (var layer : layers) {
             for (var info : layer) {
                 var box = new ClassBox(info.simpleName(), info.stereotype());
+                if (showDetails) {
+                    box.showDetails();
+                }
                 box.setFillColor(info.stereotype() == ClassStereotype.INTERFACE
                     ? interfaceFillColor : classFillColor);
                 boxMap.put(info, box);

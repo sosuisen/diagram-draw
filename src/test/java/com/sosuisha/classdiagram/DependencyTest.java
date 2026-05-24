@@ -118,6 +118,12 @@ class DependencyTest {
         assertTrue(svg.contains("fill=\"white\""));
     }
 
+    @Test
+    void drawRealizationUsesSlightlySmallerTriangle() {
+        var svg = realizationDep().draw();
+        assertTrue(svg.contains("points=\"100.0,26.0 94.0,42.0 106.0,42.0\""));
+    }
+
     private static Dependency dependencyDep() {
         var source = new ClassBox("OrderService");
         source.setPosition(50, 200);

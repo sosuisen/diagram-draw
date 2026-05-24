@@ -12,6 +12,7 @@ import java.util.Random;
  * 描画位置は {@link #setPosition(int, int)} で設定する。
  * 幅・高さはコンテンツから自動計算される。
  * 輪郭線・区切り線はコンテンツのハッシュを種としたゆらぎを持つ。
+ * デフォルトではクラス名のみを描画し、{@link #showDetails()} で詳細表示に切り替える。
  */
 public final class ClassBox implements SvgElement {
 
@@ -20,6 +21,7 @@ public final class ClassBox implements SvgElement {
     private static final int LINE_GAP   = 4;
     private static final int PADDING_X  = 8;
     private static final int PADDING_Y  = 4;
+    private static final int NAME_ONLY_PADDING_Y = 6;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int MIN_WIDTH  = 100;
     private static final double SKETCH_MAX_NONE = 1.0;
@@ -33,6 +35,7 @@ public final class ClassBox implements SvgElement {
     private int x = 0;
     private int y = 0;
     private String fillColor = null;
+    private boolean showDetails = false;
 
     /**
      * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
@@ -129,6 +132,16 @@ public final class ClassBox implements SvgElement {
     public String fillColor() { return fillColor; }
 
     /**
+     * ステレオタイプ、フィールド、メソッド、および区切り線を描画する詳細表示に切り替える。
+     *
+     * @return このClassBox自身（メソッドチェーン用）
+     */
+    public ClassBox showDetails() {
+        this.showDetails = true;
+        return this;
+    }
+
+    /**
      * コンテンツから自動計算した幅を返す。
      *
      * @return 幅（px）
@@ -138,11 +151,13 @@ public final class ClassBox implements SvgElement {
         if (stereotype != ClassStereotype.NONE) {
             maxLen = Math.max(maxLen, stereotype.label().length());
         }
-        for (var f : fields) {
-            maxLen = Math.max(maxLen, f.length());
-        }
-        for (var m : methods) {
-            maxLen = Math.max(maxLen, m.length());
+        if (showDetails) {
+            for (var f : fields) {
+                maxLen = Math.max(maxLen, f.length());
+            }
+            for (var m : methods) {
+                maxLen = Math.max(maxLen, m.length());
+            }
         }
         return Math.max(MIN_WIDTH, maxLen * CHAR_WIDTH + PADDING_X * 2);
     }
@@ -154,9 +169,12 @@ public final class ClassBox implements SvgElement {
      */
     public int height() {
         int nameLines = stereotype == ClassStereotype.NONE ? 1 : 2;
-        return compartmentHeight(nameLines)
-             + compartmentHeight(fields.size())
-             + compartmentHeight(methods.size());
+        int h = showDetails ? compartmentHeight(nameLines) : nameOnlyCompartmentHeight(nameLines);
+        if (showDetails) {
+            h += compartmentHeight(fields.size())
+               + compartmentHeight(methods.size());
+        }
+        return h;
     }
 
     /**
@@ -174,10 +192,12 @@ public final class ClassBox implements SvgElement {
 
         int ch = 0;
         ch += appendNameCompartment(content, w, ch);
-        content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
-        ch += appendTextCompartment(content, fields, w, ch);
-        content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
-        appendTextCompartment(content, methods, w, ch);
+        if (showDetails) {
+            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
+            ch += appendTextCompartment(content, fields, w, ch);
+            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
+            appendTextCompartment(content, methods, w, ch);
+        }
 
         var sb = new StringBuilder();
         if (x != 0 || y != 0) {
@@ -198,6 +218,9 @@ public final class ClassBox implements SvgElement {
     }
 
     private double sketchMax() {
+        if (!showDetails) {
+            return SKETCH_MAX_NONE;
+        }
         if (!fields.isEmpty() && !methods.isEmpty()) {
             return SKETCH_MAX_FULL;
         }
@@ -208,7 +231,10 @@ public final class ClassBox implements SvgElement {
     }
 
     private Random createRandom() {
-        return new Random(Objects.hash(name, fields, methods));
+        if (!showDetails) {
+            return new Random(Objects.hash(name));
+        }
+        return new Random(Objects.hash(name, stereotype, fields, methods));
     }
 
     private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng, double sketchMax) {
@@ -237,7 +263,26 @@ public final class ClassBox implements SvgElement {
         return lineCount * FONT_SIZE + (lineCount - 1) * LINE_GAP + PADDING_Y * 2;
     }
 
+    private static int nameOnlyCompartmentHeight(int lineCount) {
+        return lineCount * FONT_SIZE + (lineCount - 1) * LINE_GAP + NAME_ONLY_PADDING_Y * 2;
+    }
+
     private int appendNameCompartment(StringBuilder sb, int width, int startY) {
+        if (!showDetails) {
+            if (stereotype == ClassStereotype.NONE) {
+                int textY = startY + NAME_ONLY_PADDING_Y + ASCENT;
+                sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+                    width / 2, textY, FONT_SIZE, name));
+                return nameOnlyCompartmentHeight(1);
+            }
+            int stereoY = startY + NAME_ONLY_PADDING_Y + ASCENT;
+            int nameY = startY + NAME_ONLY_PADDING_Y + ASCENT + FONT_SIZE + LINE_GAP;
+            sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+                width / 2, stereoY, FONT_SIZE - 2, stereotype.label()));
+            sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
+                width / 2, nameY, FONT_SIZE, name));
+            return nameOnlyCompartmentHeight(2);
+        }
         if (stereotype == ClassStereotype.NONE) {
             int textY = startY + PADDING_Y + ASCENT;
             sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(

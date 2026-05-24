@@ -24,6 +24,9 @@ public class ClassDiagramGenerator {
     private String classFillColor = null;
     private String interfaceFillColor = null;
     private String packageFillColor = null;
+    private String packageStrokeColor = null;
+    private String classBoxStrokeColor = null;
+    private String edgeColor = null;
     private boolean showDetails = false;
     private boolean picturesque = false;
 
@@ -111,6 +114,42 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * パッケージ枠線色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator packageStrokeColor(String hex) {
+        this.packageStrokeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * クラスボックス枠線色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator classBoxStrokeColor(String hex) {
+        this.classBoxStrokeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * エッジ色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramGenerator edgeColor(String hex) {
+        this.edgeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
      * クラスボックスを詳細表示にする。ステレオタイプ、フィールド、メソッド、および区切り線を描画する。
      *
      * @return このジェネレーター自身（メソッドチェーン用）
@@ -162,6 +201,9 @@ public class ClassDiagramGenerator {
         if (classFillColor != null) layoutEngine.classFillColor(classFillColor);
         if (interfaceFillColor != null) layoutEngine.interfaceFillColor(interfaceFillColor);
         if (packageFillColor != null) layoutEngine.packageFillColor(packageFillColor);
+        if (packageStrokeColor != null) layoutEngine.packageStrokeColor(packageStrokeColor);
+        if (classBoxStrokeColor != null) layoutEngine.classBoxStrokeColor(classBoxStrokeColor);
+        if (edgeColor != null) layoutEngine.edgeColor(edgeColor);
         var result = layoutEngine.layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
         if (fontFamily != null) builder.fontFamily(fontFamily);

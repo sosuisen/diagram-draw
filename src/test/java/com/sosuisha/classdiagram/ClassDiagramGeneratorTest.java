@@ -107,6 +107,22 @@ class ClassDiagramGeneratorTest {
     }
 
     @Test
+    void strokeColorOptionsReturnSelf() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.packageStrokeColor("#123456"));
+        assertSame(gen, gen.classBoxStrokeColor("#234567"));
+        assertSame(gen, gen.edgeColor("#345678"));
+    }
+
+    @Test
+    void strokeColorOptionsThrowForNull() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertThrows(NullPointerException.class, () -> gen.packageStrokeColor(null));
+        assertThrows(NullPointerException.class, () -> gen.classBoxStrokeColor(null));
+        assertThrows(NullPointerException.class, () -> gen.edgeColor(null));
+    }
+
+    @Test
     void generateEmitsPackageGroupSvgWhenSubPackageGroupingEnabled() {
         var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
             .enableSubPackageGrouping(30)
@@ -133,6 +149,20 @@ class ClassDiagramGeneratorTest {
                       "com.sosuisha.classdiagram.analyzer.fixture");
         assertTrue(picturesqueSvg.contains("data-diagram-draw=\"package-shadow-solid\""));
         assertTrue(picturesqueSvg.contains("data-diagram-draw=\"package-shadow-dashed\""));
+    }
+
+    @Test
+    void generateUsesConfiguredStrokeColors() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(30)
+            .packageStrokeColor("#123456")
+            .classBoxStrokeColor("#234567")
+            .edgeColor("#345678")
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svg.contains("stroke=\"#123456\""));
+        assertTrue(svg.contains("stroke=\"#234567\""));
+        assertTrue(svg.contains("stroke=\"#345678\""));
     }
 
     @Test

@@ -27,6 +27,7 @@ public final class ClassBox implements SvgElement {
     private static final double SKETCH_MAX_NONE = 1.0;
     private static final double SKETCH_MAX_SOME = 1.5;
     private static final double SKETCH_MAX_FULL = 2.0;
+    private static final String DEFAULT_STROKE_COLOR = "#000000";
 
     private final ClassStereotype stereotype;
     private final String name;
@@ -35,6 +36,7 @@ public final class ClassBox implements SvgElement {
     private int x = 0;
     private int y = 0;
     private String fillColor = null;
+    private String strokeColor = DEFAULT_STROKE_COLOR;
     private boolean showDetails = false;
     private boolean picturesque = false;
 
@@ -133,6 +135,19 @@ public final class ClassBox implements SvgElement {
     public String fillColor() { return fillColor; }
 
     /**
+     * 枠線色を設定する。
+     *
+     * @param strokeColor SVG 互換の色文字列（例: {@code "#000000"}）
+     * @throws NullPointerException strokeColorがnullの場合
+     */
+    public void setStrokeColor(String strokeColor) {
+        this.strokeColor = Objects.requireNonNull(strokeColor, "strokeColor must not be null");
+    }
+
+    /** @return 枠線色 */
+    public String strokeColor() { return strokeColor; }
+
+    /**
      * ステレオタイプ、フィールド、メソッド、および区切り線を描画する詳細表示に切り替える。
      *
      * @return このClassBox自身（メソッドチェーン用）
@@ -206,9 +221,9 @@ public final class ClassBox implements SvgElement {
         int ch = 0;
         ch += appendNameCompartment(content, w, ch);
         if (showDetails) {
-            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
+            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax, strokeColor));
             ch += appendTextCompartment(content, fields, w, ch);
-            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax));
+            content.append(sketchyLine(0, ch, w, ch, rng, sketchMax, strokeColor));
             appendTextCompartment(content, methods, w, ch);
         }
 
@@ -255,20 +270,21 @@ public final class ClassBox implements SvgElement {
     }
 
     private static String sketchBoldLine(int x1, int y1, int x2, int y2,
-                                         Random rng, Random boldRng, double sketchMax) {
-        return sketchyLine(x1, y1, x2, y2, rng, sketchMax)
-            + sketchyLine(x1 + 1, y1 + 1, x2 + 1, y2 + 1, boldRng, sketchMax);
+                                         Random rng, Random boldRng, double sketchMax, String strokeColor) {
+        return sketchyLine(x1, y1, x2, y2, rng, sketchMax, strokeColor)
+            + sketchyLine(x1 + 1, y1 + 1, x2 + 1, y2 + 1, boldRng, sketchMax, strokeColor);
     }
 
     private String outlineLine(int x1, int y1, int x2, int y2,
                                Random rng, Random boldRng, double sketchMax) {
         if (picturesque) {
-            return sketchBoldLine(x1, y1, x2, y2, rng, boldRng, sketchMax);
+            return sketchBoldLine(x1, y1, x2, y2, rng, boldRng, sketchMax, strokeColor);
         }
-        return sketchyLine(x1, y1, x2, y2, rng, sketchMax);
+        return sketchyLine(x1, y1, x2, y2, rng, sketchMax, strokeColor);
     }
 
-    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng, double sketchMax) {
+    private static String sketchyLine(int x1, int y1, int x2, int y2,
+                                      Random rng, double sketchMax, String strokeColor) {
         double wobble = rng.nextDouble() * sketchMax * 2 - sketchMax;
         int mx = (x1 + x2) / 2;
         int my = (y1 + y2) / 2;
@@ -283,8 +299,8 @@ public final class ClassBox implements SvgElement {
             cp1x += wobble;
             cp2x -= wobble;
         }
-        return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"black\"/>".formatted(
-            x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2);
+        return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"%s\"/>".formatted(
+            x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2, strokeColor);
     }
 
     private static int compartmentHeight(int lineCount) {

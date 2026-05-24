@@ -76,6 +76,26 @@ class PackageGroupBoxTest {
     }
 
     @Test
+    void drawUsesDefaultPackageStrokeColor() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50);
+        assertTrue(box.draw().contains("stroke=\"#000000\""));
+    }
+
+    @Test
+    void drawUsesCustomPackageStrokeColor() {
+        var box = new PackageGroupBox("p", 0, 0, 100, 50, "#abcdef", true, "#123456");
+        var svg = box.draw();
+        assertTrue(svg.contains("stroke=\"#123456\""));
+        assertEquals("#123456", box.strokeColor());
+    }
+
+    @Test
+    void throwsWhenPackageStrokeColorIsNull() {
+        assertThrows(NullPointerException.class,
+            () -> new PackageGroupBox("p", 0, 0, 100, 50, "#abcdef", false, null));
+    }
+
+    @Test
     void drawOmitsFillRectWhenFillColorNull() {
         var box = new PackageGroupBox("p", 0, 0, 100, 50);
         var svg = box.draw();

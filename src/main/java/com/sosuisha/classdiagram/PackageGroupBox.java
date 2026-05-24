@@ -17,6 +17,7 @@ public final class PackageGroupBox implements SvgElement {
     private final int height;
     private final String fillColor;
     private final boolean picturesque;
+    private final String strokeColor;
 
     /**
      * PackageGroupBoxを生成する（塗りつぶしなし）。
@@ -64,7 +65,27 @@ public final class PackageGroupBox implements SvgElement {
      */
     public PackageGroupBox(String label, int x, int y, int width, int height,
                            String fillColor, boolean picturesque) {
+        this(label, x, y, width, height, fillColor, picturesque, DEFAULT_STROKE_COLOR);
+    }
+
+    /**
+     * PackageGroupBoxを生成する。
+     *
+     * @param label       サブパッケージラベル
+     * @param x           左上X座標
+     * @param y           左上Y座標
+     * @param width       幅（px、正数）
+     * @param height      高さ（px、正数）
+     * @param fillColor   塗りつぶし色（{@code null} で塗りなし）
+     * @param picturesque 装飾的な影表現を描画する場合は {@code true}
+     * @param strokeColor 枠線色
+     * @throws NullPointerException     labelまたはstrokeColorがnullの場合
+     * @throws IllegalArgumentException widthまたはheightが0以下の場合
+     */
+    public PackageGroupBox(String label, int x, int y, int width, int height,
+                           String fillColor, boolean picturesque, String strokeColor) {
         Objects.requireNonNull(label, "label must not be null");
+        Objects.requireNonNull(strokeColor, "strokeColor must not be null");
         if (width <= 0) {
             throw new IllegalArgumentException("width must be positive: " + width);
         }
@@ -78,6 +99,7 @@ public final class PackageGroupBox implements SvgElement {
         this.height = height;
         this.fillColor = fillColor;
         this.picturesque = picturesque;
+        this.strokeColor = strokeColor;
     }
 
     /** @return サブパッケージラベル */
@@ -101,6 +123,9 @@ public final class PackageGroupBox implements SvgElement {
     /** @return 装飾的な影表現を描画する場合は {@code true} */
     public boolean picturesque() { return picturesque; }
 
+    /** @return 枠線色 */
+    public String strokeColor() { return strokeColor; }
+
     private static final int FONT_SIZE = 12;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int LABEL_PADDING_X = 6;
@@ -110,6 +135,7 @@ public final class PackageGroupBox implements SvgElement {
     private static final int SHADOW_START_OFFSET = 2;
     private static final int SHADOW_LINE_GAP = 4;
     private static final double SKETCH_MAX = 1.5;
+    private static final String DEFAULT_STROKE_COLOR = "#000000";
 
     /**
      * PackageGroupBoxのSVG表現を返す。UML 標準のタブ付きフォルダ形状で描画する。
@@ -138,12 +164,12 @@ public final class PackageGroupBox implements SvgElement {
         }
         // Outline tracing the tabbed shape clockwise. Tab right uses a straight line
         // because the segment is too short for the wobble to look natural.
-        sb.append(sketchyLine(0, 0, tabWidth, 0, rng));                     // tab top
-        sb.append(straightPath(tabWidth, 0, tabWidth, TAB_HEIGHT));         // tab right (straight)
-        sb.append(sketchyLine(tabWidth, TAB_HEIGHT, width, TAB_HEIGHT, rng)); // main top (right of tab)
-        sb.append(sketchyLine(width, TAB_HEIGHT, width, height, rng));      // main right
-        sb.append(sketchyLine(width, height, 0, height, rng));              // main bottom
-        sb.append(sketchyLine(0, height, 0, 0, rng));                       // left (full height)
+        sb.append(sketchyLine(0, 0, tabWidth, 0, rng, strokeColor));                     // tab top
+        sb.append(straightPath(tabWidth, 0, tabWidth, TAB_HEIGHT, strokeColor));         // tab right (straight)
+        sb.append(sketchyLine(tabWidth, TAB_HEIGHT, width, TAB_HEIGHT, rng, strokeColor)); // main top (right of tab)
+        sb.append(sketchyLine(width, TAB_HEIGHT, width, height, rng, strokeColor));      // main right
+        sb.append(sketchyLine(width, height, 0, height, rng, strokeColor));              // main bottom
+        sb.append(sketchyLine(0, height, 0, 0, rng, strokeColor));                       // left (full height)
         if (picturesque) {
             appendCornerShadow(sb);
         }
@@ -155,7 +181,7 @@ public final class PackageGroupBox implements SvgElement {
         return sb.toString();
     }
 
-    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng) {
+    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng, String strokeColor) {
         double wobble = rng.nextDouble() * SKETCH_MAX * 2 - SKETCH_MAX;
         int mx = (x1 + x2) / 2;
         int my = (y1 + y2) / 2;
@@ -170,13 +196,13 @@ public final class PackageGroupBox implements SvgElement {
             cp1x += wobble;
             cp2x -= wobble;
         }
-        return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"black\"/>"
-            .formatted(x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2);
+        return "<path d=\"M %d,%d Q %.1f,%.1f %d,%d Q %.1f,%.1f %d,%d\" fill=\"none\" stroke=\"%s\"/>"
+            .formatted(x1, y1, cp1x, cp1y, mx, my, cp2x, cp2y, x2, y2, strokeColor);
     }
 
-    private static String straightPath(int x1, int y1, int x2, int y2) {
-        return "<path d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"black\"/>"
-            .formatted(x1, y1, x2, y2);
+    private static String straightPath(int x1, int y1, int x2, int y2, String strokeColor) {
+        return "<path d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"%s\"/>"
+            .formatted(x1, y1, x2, y2, strokeColor);
     }
 
     private void appendCornerShadow(StringBuilder sb) {
@@ -188,17 +214,17 @@ public final class PackageGroupBox implements SvgElement {
             int y2 = height - offset;
             double solidRatio = 0.6 + (SHADOW_LINE_COUNT - 1 - i) * 0.1;
             if (solidRatio >= 1.0) {
-                sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"black\"/>"
-                    .formatted(x1, y1, x2, y2));
+                sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %d,%d\" fill=\"none\" stroke=\"%s\"/>"
+                    .formatted(x1, y1, x2, y2, strokeColor));
                 continue;
             }
             double splitX = x1 + (x2 - x1) * solidRatio;
             double splitY = y1 + (y2 - y1) * solidRatio;
-            sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %.1f,%.1f\" fill=\"none\" stroke=\"black\"/>"
-                .formatted(x1, y1, splitX, splitY));
+            sb.append("<path data-diagram-draw=\"package-shadow-solid\" d=\"M %d,%d L %.1f,%.1f\" fill=\"none\" stroke=\"%s\"/>"
+                .formatted(x1, y1, splitX, splitY, strokeColor));
             if (solidRatio < 1.0) {
-                sb.append("<path data-diagram-draw=\"package-shadow-dashed\" d=\"M %.1f,%.1f L %d,%d\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"2,2\"/>"
-                    .formatted(splitX, splitY, x2, y2));
+                sb.append("<path data-diagram-draw=\"package-shadow-dashed\" d=\"M %.1f,%.1f L %d,%d\" fill=\"none\" stroke=\"%s\" stroke-dasharray=\"2,2\"/>"
+                    .formatted(splitX, splitY, x2, y2, strokeColor));
             }
         }
     }

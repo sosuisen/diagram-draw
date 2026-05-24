@@ -72,6 +72,24 @@ class ClassBoxTest {
     }
 
     @Test
+    void drawUsesDefaultClassBoxStrokeColor() {
+        assertTrue(new ClassBox("MyClass").draw().contains("stroke=\"#000000\""));
+    }
+
+    @Test
+    void drawUsesCustomClassBoxStrokeColor() {
+        var box = new ClassBox("MyClass");
+        box.setStrokeColor("#123456");
+        assertTrue(box.draw().contains("stroke=\"#123456\""));
+    }
+
+    @Test
+    void setStrokeColorThrowsForNull() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassBox("MyClass").setStrokeColor(null));
+    }
+
+    @Test
     void drawContainsFourPathsByDefault() {
         // 4辺（rect代替）。nameOnly がデフォルトなので区切り線は描画しない。
         var result = new ClassBox("MyClass").draw();

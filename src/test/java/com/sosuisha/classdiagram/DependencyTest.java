@@ -64,8 +64,27 @@ class DependencyTest {
     }
 
     @Test
+    void drawUsesDefaultEdgeColor() {
+        assertTrue(dep(DependencyType.COMPOSITION).draw().contains("stroke=\"#000000\""));
+    }
+
+    @Test
+    void drawUsesCustomEdgeColor() {
+        var dep = dep(DependencyType.COMPOSITION).edgeColor("#123456");
+        var svg = dep.draw();
+        assertTrue(svg.contains("stroke=\"#123456\""));
+        assertTrue(svg.contains("fill=\"#123456\""));
+    }
+
+    @Test
+    void edgeColorThrowsForNull() {
+        assertThrows(NullPointerException.class,
+            () -> dep(DependencyType.COMPOSITION).edgeColor(null));
+    }
+
+    @Test
     void compositionDiamondIsFilled() {
-        assertTrue(dep(DependencyType.COMPOSITION).draw().contains("fill=\"black\""));
+        assertTrue(dep(DependencyType.COMPOSITION).draw().contains("fill=\"#000000\""));
     }
 
     @Test
@@ -75,7 +94,7 @@ class DependencyTest {
         // (composition's polygon has fill="black"; dependency curve uses fill="none").
         assertTrue(svg.contains("<polygon"));
         assertTrue(svg.contains("fill=\"white\""));
-        assertFalse(svg.contains("fill=\"black\""));
+        assertFalse(svg.contains("fill=\"#000000\""));
     }
 
     @Test
@@ -151,6 +170,6 @@ class DependencyTest {
 
     @Test
     void drawDependencyHasNoFilledDiamond() {
-        assertFalse(dependencyDep().draw().contains("fill=\"black\""));
+        assertFalse(dependencyDep().draw().contains("fill=\"#000000\""));
     }
 }

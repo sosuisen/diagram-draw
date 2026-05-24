@@ -41,6 +41,9 @@ public class ClassDiagramLayout {
     private String classFillColor = "#FFFFBB";
     private String interfaceFillColor = "#BDFFDE";
     private String packageFillColor = "#f0f0f0";
+    private String packageStrokeColor = "#000000";
+    private String classBoxStrokeColor = "#000000";
+    private String edgeColor = "#000000";
     private boolean showDetails = false;
     private boolean picturesque = false;
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
@@ -123,6 +126,42 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * パッケージ枠線色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout packageStrokeColor(String hex) {
+        this.packageStrokeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * クラスボックス枠線色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout classBoxStrokeColor(String hex) {
+        this.classBoxStrokeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
+     * エッジ色を設定する。デフォルト: {@code "#000000"}。
+     *
+     * @param hex SVG 互換色文字列
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException hexがnullの場合
+     */
+    public ClassDiagramLayout edgeColor(String hex) {
+        this.edgeColor = Objects.requireNonNull(hex, "hex must not be null");
+        return this;
+    }
+
+    /**
      * クラスボックスを詳細表示にする。ステレオタイプ、フィールド、メソッド、および区切り線を描画する。
      *
      * @return このレイアウト自身（メソッドチェーン用）
@@ -182,6 +221,7 @@ public class ClassDiagramLayout {
                     box.showDetails();
                 }
                 box.picturesque(picturesque);
+                box.setStrokeColor(classBoxStrokeColor);
                 box.setFillColor(info.stereotype() == ClassStereotype.INTERFACE
                     ? interfaceFillColor : classFillColor);
                 boxMap.put(info, box);
@@ -288,7 +328,7 @@ public class ClassDiagramLayout {
             var src = boxMap.get(rel.sourceClassInfo());
             var tgt = boxMap.get(rel.targetClassInfo());
             if (src != null && tgt != null) {
-                dependencies.add(new Dependency(src, tgt, rel.type()));
+                dependencies.add(new Dependency(src, tgt, rel.type()).edgeColor(edgeColor));
             }
         }
 
@@ -307,7 +347,7 @@ public class ClassDiagramLayout {
                 var src = boxMap.get(srcInfo);
                 var tgt = boxMap.get(tgtInfo);
                 if (src != null && tgt != null) {
-                    dependencies.add(new Dependency(src, tgt, DependencyType.DEPENDENCY));
+                    dependencies.add(new Dependency(src, tgt, DependencyType.DEPENDENCY).edgeColor(edgeColor));
                 }
             }
         }
@@ -620,7 +660,7 @@ public class ClassDiagramLayout {
         if (hasRect) {
             packageGroups.add(new PackageGroupBox(
                 node.localLabel, x, y, totalWidth, totalHeight,
-                darkenForDepth(packageFillColor, depth), picturesque));
+                darkenForDepth(packageFillColor, depth), picturesque, packageStrokeColor));
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
@@ -653,7 +693,7 @@ public class ClassDiagramLayout {
             var old = packageGroups.get(i);
             packageGroups.set(i, new PackageGroupBox(
                 old.label(), old.x() + dx, old.y() + dy,
-                old.width(), old.height(), old.fillColor(), old.picturesque()));
+                old.width(), old.height(), old.fillColor(), old.picturesque(), old.strokeColor()));
         }
     }
 

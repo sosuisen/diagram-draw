@@ -5,7 +5,8 @@ import java.util.Objects;
 /**
  * クラス間の依存関係を表す。
  *
- * <p>依存元・依存先の {@link ClassBox} と依存の種類 {@link DependencyType} を格納し、
+ * <p>
+ * 依存元・依存先の {@link ClassBox} と依存の種類 {@link DependencyType} を格納し、
  * UMLの関係線としてSVGを出力する。
  */
 public final class Dependency implements SvgElement {
@@ -18,13 +19,17 @@ public final class Dependency implements SvgElement {
     private static final double ARROWHEAD_HALF_ANGLE = Math.PI / 6.0; // 30 degrees
     private static final double CURVE_OFFSET_MIN = 20.0;
     private static final double CURVE_OFFSET_RATIO = 1.0 / 3.0;
+    private static final String DEFAULT_EDGE_COLOR = "#000000";
 
     /** 矩形の 4 辺を識別する列挙。 */
-    public enum BoxEdge { TOP, RIGHT, BOTTOM, LEFT }
+    public enum BoxEdge {
+        TOP, RIGHT, BOTTOM, LEFT
+    }
 
     private final ClassBox source;
     private final ClassBox target;
     private final DependencyType type;
+    private String edgeColor = DEFAULT_EDGE_COLOR;
     private double[] customSourceAnchor;
     private double[] customSourceDir;
     private double[] customTargetAnchor;
@@ -35,7 +40,7 @@ public final class Dependency implements SvgElement {
      *
      * @param source 依存元ClassBox
      * @param target 依存先ClassBox
-     * @param type 依存の種類
+     * @param type   依存の種類
      * @throws NullPointerException source、target、またはtypeがnullの場合
      */
     public Dependency(ClassBox source, ClassBox target, DependencyType type) {
@@ -48,40 +53,59 @@ public final class Dependency implements SvgElement {
     }
 
     /** @return 依存元ClassBox */
-    public ClassBox source() { return source; }
+    public ClassBox source() {
+        return source;
+    }
 
     /** @return 依存先ClassBox */
-    public ClassBox target() { return target; }
+    public ClassBox target() {
+        return target;
+    }
 
     /** @return 依存の種類 */
-    public DependencyType type() { return type; }
+    public DependencyType type() {
+        return type;
+    }
+
+    /**
+     * エッジ色を設定する。
+     *
+     * @param edgeColor SVG 互換の色文字列（例: {@code "#000000"}）
+     * @return このDependency自身（メソッドチェーン用）
+     * @throws NullPointerException edgeColorがnullの場合
+     */
+    public Dependency edgeColor(String edgeColor) {
+        this.edgeColor = Objects.requireNonNull(edgeColor, "edgeColor must not be null");
+        return this;
+    }
 
     /**
      * ソース端点と出口方向を明示的に上書きする。レイアウト側が辺上の複数エッジを分散配置する
      * ために使用する。未設定時は中心レイ法でソース辺と交差する点を自動計算する。
      */
     public void setSourceAnchor(double x, double y, double dirX, double dirY) {
-        this.customSourceAnchor = new double[]{x, y};
-        this.customSourceDir = new double[]{dirX, dirY};
+        this.customSourceAnchor = new double[] { x, y };
+        this.customSourceDir = new double[] { dirX, dirY };
     }
 
     /**
      * ターゲット端点と入口方向を明示的に上書きする。
      */
     public void setTargetAnchor(double x, double y, double dirX, double dirY) {
-        this.customTargetAnchor = new double[]{x, y};
-        this.customTargetDir = new double[]{dirX, dirY};
+        this.customTargetAnchor = new double[] { x, y };
+        this.customTargetDir = new double[] { dirX, dirY };
     }
 
     /**
      * 依存関係のSVG表現を返す。
      *
-     * <p>アルゴリズム概要:
+     * <p>
+     * アルゴリズム概要:
      * <ol>
-     *   <li>ソース中心とターゲット中心を結ぶ方向ベクトルを正規化する。</li>
-     *   <li>ソースボックスの辺との交差点を求め、ダイアモンドの中心とする。</li>
-     *   <li>ターゲットボックスの辺との交差点を求め、線の終点とする。</li>
-     *   <li>ダイアモンドの前端（ターゲット方向）から終点へ線を引く。</li>
+     * <li>ソース中心とターゲット中心を結ぶ方向ベクトルを正規化する。</li>
+     * <li>ソースボックスの辺との交差点を求め、ダイアモンドの中心とする。</li>
+     * <li>ターゲットボックスの辺との交差点を求め、線の終点とする。</li>
+     * <li>ダイアモンドの前端（ターゲット方向）から終点へ線を引く。</li>
      * </ol>
      *
      * @return SVGのgタグ文字列
@@ -138,10 +162,11 @@ public final class Dependency implements SvgElement {
         double lineY1 = diamondCy + exitDir[1] * DIAMOND_HALF_LEN;
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
+                .formatted(type.name().toLowerCase()));
         sb.append(drawDiamond(diamond));
-        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\"/>".formatted(
-            cubicBezierPath(lineX1, lineY1, exitDir, tp[0], tp[1], entryDir)));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\"/>".formatted(
+                cubicBezierPath(lineX1, lineY1, exitDir, tp[0], tp[1], entryDir), edgeColor));
         sb.append("</g>");
         return sb.toString();
     }
@@ -151,11 +176,15 @@ public final class Dependency implements SvgElement {
      */
     static double[] outwardNormal(ClassBox box, double px, double py) {
         double tol = 0.5;
-        if (Math.abs(px - box.x()) < tol) return new double[]{-1.0, 0.0};
-        if (Math.abs(px - (box.x() + box.width())) < tol) return new double[]{1.0, 0.0};
-        if (Math.abs(py - box.y()) < tol) return new double[]{0.0, -1.0};
-        if (Math.abs(py - (box.y() + box.height())) < tol) return new double[]{0.0, 1.0};
-        return new double[]{0.0, 1.0};
+        if (Math.abs(px - box.x()) < tol)
+            return new double[] { -1.0, 0.0 };
+        if (Math.abs(px - (box.x() + box.width())) < tol)
+            return new double[] { 1.0, 0.0 };
+        if (Math.abs(py - box.y()) < tol)
+            return new double[] { 0.0, -1.0 };
+        if (Math.abs(py - (box.y() + box.height())) < tol)
+            return new double[] { 0.0, 1.0 };
+        return new double[] { 0.0, 1.0 };
     }
 
     /**
@@ -176,23 +205,24 @@ public final class Dependency implements SvgElement {
         double c2x = ex + entryDir[0] * offset;
         double c2y = ey + entryDir[1] * offset;
         return "M %.1f,%.1f C %.1f,%.1f %.1f,%.1f %.1f,%.1f".formatted(
-            sx, sy, c1x, c1y, c2x, c2y, ex, ey);
+                sx, sy, c1x, c1y, c2x, c2y, ex, ey);
     }
 
     /**
      * ボックスの中心から方向(dirX, dirY)に向かう光線が、ボックスの辺と最初に交差する点を返す。
      *
-     * <p>アルゴリズム概要（パラメトリック光線-矩形交差）:
+     * <p>
+     * アルゴリズム概要（パラメトリック光線-矩形交差）:
      * <ul>
-     *   <li>光線: P(t) = center + t * direction (t &gt; 0)</li>
-     *   <li>左辺: t = (box.x − cx) / dirX</li>
-     *   <li>右辺: t = (box.x + box.width − cx) / dirX</li>
-     *   <li>上辺: t = (box.y − cy) / dirY</li>
-     *   <li>下辺: t = (box.y + box.height − cy) / dirY</li>
-     *   <li>各 t について交点が辺内に収まるか確認し、最小の正の t を採用する。</li>
+     * <li>光線: P(t) = center + t * direction (t &gt; 0)</li>
+     * <li>左辺: t = (box.x − cx) / dirX</li>
+     * <li>右辺: t = (box.x + box.width − cx) / dirX</li>
+     * <li>上辺: t = (box.y − cy) / dirY</li>
+     * <li>下辺: t = (box.y + box.height − cy) / dirY</li>
+     * <li>各 t について交点が辺内に収まるか確認し、最小の正の t を採用する。</li>
      * </ul>
      *
-     * @param box 対象のClassBox
+     * @param box  対象のClassBox
      * @param dirX 方向ベクトルのX成分（正規化済み）
      * @param dirY 方向ベクトルのY成分（正規化済み）
      * @return ボックス辺上の交差点 [x, y]
@@ -203,10 +233,14 @@ public final class Dependency implements SvgElement {
      */
     static BoxEdge whichEdge(ClassBox box, double px, double py) {
         double tol = 0.5;
-        if (Math.abs(px - box.x()) < tol) return BoxEdge.LEFT;
-        if (Math.abs(px - (box.x() + box.width())) < tol) return BoxEdge.RIGHT;
-        if (Math.abs(py - box.y()) < tol) return BoxEdge.TOP;
-        if (Math.abs(py - (box.y() + box.height())) < tol) return BoxEdge.BOTTOM;
+        if (Math.abs(px - box.x()) < tol)
+            return BoxEdge.LEFT;
+        if (Math.abs(px - (box.x() + box.width())) < tol)
+            return BoxEdge.RIGHT;
+        if (Math.abs(py - box.y()) < tol)
+            return BoxEdge.TOP;
+        if (Math.abs(py - (box.y() + box.height())) < tol)
+            return BoxEdge.BOTTOM;
         return BoxEdge.BOTTOM;
     }
 
@@ -249,24 +283,24 @@ public final class Dependency implements SvgElement {
             }
         }
 
-        return new double[]{ cx + minT * dirX, cy + minT * dirY };
+        return new double[] { cx + minT * dirX, cy + minT * dirY };
     }
 
     private double[] calcDiamond(double cx, double cy, double nx, double ny) {
         double px = -ny;
         double py = nx;
-        return new double[]{
-            cx + nx * DIAMOND_HALF_LEN, cy + ny * DIAMOND_HALF_LEN,
-            cx + px * DIAMOND_HALF_WIDTH, cy + py * DIAMOND_HALF_WIDTH,
-            cx - nx * DIAMOND_HALF_LEN, cy - ny * DIAMOND_HALF_LEN,
-            cx - px * DIAMOND_HALF_WIDTH, cy - py * DIAMOND_HALF_WIDTH
+        return new double[] {
+                cx + nx * DIAMOND_HALF_LEN, cy + ny * DIAMOND_HALF_LEN,
+                cx + px * DIAMOND_HALF_WIDTH, cy + py * DIAMOND_HALF_WIDTH,
+                cx - nx * DIAMOND_HALF_LEN, cy - ny * DIAMOND_HALF_LEN,
+                cx - px * DIAMOND_HALF_WIDTH, cy - py * DIAMOND_HALF_WIDTH
         };
     }
 
     private String drawDiamond(double[] pts) {
-        String fill = type == DependencyType.COMPOSITION ? "black" : "white";
-        return "<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"%s\" stroke=\"black\"/>".formatted(
-            pts[0], pts[1], pts[2], pts[3], pts[4], pts[5], pts[6], pts[7], fill);
+        String fill = type == DependencyType.COMPOSITION ? edgeColor : "white";
+        return "<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"%s\" stroke=\"%s\"/>".formatted(
+                pts[0], pts[1], pts[2], pts[3], pts[4], pts[5], pts[6], pts[7], fill, edgeColor);
     }
 
     private String drawRealization(double[] sp, double[] tp, double[] exitDir, double[] entryDir) {
@@ -281,11 +315,12 @@ public final class Dependency implements SvgElement {
         double by2 = baseCy - py * TRIANGLE_HALF_WIDTH;
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
-        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
-            cubicBezierPath(sp[0], sp[1], exitDir, baseCx, baseCy, entryDir)));
-        sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"black\"/>".formatted(
-            tp[0], tp[1], bx1, by1, bx2, by2));
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
+                .formatted(type.name().toLowerCase()));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\" stroke-dasharray=\"8,4\"/>".formatted(
+                cubicBezierPath(sp[0], sp[1], exitDir, baseCx, baseCy, entryDir), edgeColor));
+        sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"%s\"/>".formatted(
+                tp[0], tp[1], bx1, by1, bx2, by2, edgeColor));
         sb.append("</g>");
         return sb.toString();
     }
@@ -299,11 +334,12 @@ public final class Dependency implements SvgElement {
         double ay2 = tp[1] - ARROWHEAD_LEN * Math.sin(angle + ARROWHEAD_HALF_ANGLE);
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">".formatted(type.name().toLowerCase()));
-        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"black\" stroke-dasharray=\"8,4\"/>".formatted(
-            cubicBezierPath(sp[0], sp[1], exitDir, tp[0], tp[1], entryDir)));
-        sb.append("<polyline points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"none\" stroke=\"black\"/>".formatted(
-            ax1, ay1, tp[0], tp[1], ax2, ay2));
+        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
+                .formatted(type.name().toLowerCase()));
+        sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\" stroke-dasharray=\"8,4\"/>".formatted(
+                cubicBezierPath(sp[0], sp[1], exitDir, tp[0], tp[1], entryDir), edgeColor));
+        sb.append("<polyline points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"none\" stroke=\"%s\"/>".formatted(
+                ax1, ay1, tp[0], tp[1], ax2, ay2, edgeColor));
         sb.append("</g>");
         return sb.toString();
     }

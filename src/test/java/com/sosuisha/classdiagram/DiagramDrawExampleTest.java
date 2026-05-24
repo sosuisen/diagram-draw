@@ -152,6 +152,11 @@ class DiagramDrawExampleTest {
                 .fontFamily("HackGen")
                 .enableSubPackageGrouping(40)
                 .picturesque(true)
+                .packageStrokeColor("#79754d")
+                .packageFillColor("#ebdfc7")
+                .edgeColor("#661d00")
+                .interfaceFillColor("#c4ffee")
+                .classFillColor("#ecffc4")
                 .generate(Path.of("samples/classes"), "com.example");
 
         var outputDir = Path.of("target/svg-output");
@@ -167,19 +172,19 @@ class DiagramDrawExampleTest {
     @Test
     void outputLongestPathReassignmentExampleSvgFile() throws IOException {
         // Controller→Service→Repository, Controller→Logger
-        // Kahn:         [[Controller], [Service, Logger], [Repository]]
-        // Longest-path: [[Controller], [Service],         [Logger, Repository]]  ← Logger moves down
+        // Kahn: [[Controller], [Service, Logger], [Repository]]
+        // Longest-path: [[Controller], [Service], [Logger, Repository]] ← Logger moves
+        // down
         var pkg = "com.example";
-        var controller  = new ClassInfo(pkg, "Controller");
-        var service     = new ClassInfo(pkg, "Service");
-        var repository  = new ClassInfo(pkg, "Repository");
-        var logger      = new ClassInfo(pkg, "Logger");
+        var controller = new ClassInfo(pkg, "Controller");
+        var service = new ClassInfo(pkg, "Service");
+        var repository = new ClassInfo(pkg, "Repository");
+        var logger = new ClassInfo(pkg, "Logger");
 
         var relations = List.of(
-            new ClassRelation(controller, service,    DependencyType.COMPOSITION, false),
-            new ClassRelation(service,    repository, DependencyType.COMPOSITION, false),
-            new ClassRelation(controller, logger,     DependencyType.AGGREGATION, false)
-        );
+                new ClassRelation(controller, service, DependencyType.COMPOSITION, false),
+                new ClassRelation(service, repository, DependencyType.COMPOSITION, false),
+                new ClassRelation(controller, logger, DependencyType.AGGREGATION, false));
 
         var layers = new ClassRelationSorter().sort(relations);
         var result = new ClassDiagramLayout(30, 50, 30, 30, 60).layout(layers, relations);
@@ -201,7 +206,7 @@ class DiagramDrawExampleTest {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
                 .fontFamily("HackGen")
                 .generate(Path.of("target/test-classes"),
-                          "com.sosuisha.classdiagram.analyzer.fixture");
+                        "com.sosuisha.classdiagram.analyzer.fixture");
 
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);

@@ -1,6 +1,7 @@
 package com.sosuisha.classdiagram;
 
 import java.util.Objects;
+import java.util.Random;
 
 /**
  * 同一サブパッケージのクラス群を囲むスケッチ風矩形を表すSVG要素。
@@ -57,6 +58,7 @@ public final class PackageGroupBox implements SvgElement {
     public int height() { return height; }
 
     private static final int FONT_SIZE = 12;
+    private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int LABEL_PADDING_X = 6;
     private static final int LABEL_PADDING_Y = 4;
     private static final double SKETCH_MAX = 1.5;
@@ -68,7 +70,7 @@ public final class PackageGroupBox implements SvgElement {
      */
     @Override
     public String draw() {
-        var rng = new java.util.Random(Objects.hash(label, width, height));
+        var rng = new Random(Objects.hash(label, width, height));
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"package-group\" data-diagram-draw-name=\"%s\" transform=\"translate(%d,%d)\">"
             .formatted(label, x, y));
@@ -78,10 +80,9 @@ public final class PackageGroupBox implements SvgElement {
         sb.append(sketchyLine(width, height, 0, height, rng));
         sb.append(sketchyLine(0, height, 0, 0, rng));
         // Label background (white rect to "cut" the top edge under the text)
-        int labelWidth = label.length() * (FONT_SIZE / 2 + 1) + LABEL_PADDING_X * 2;
+        int labelWidth = label.length() * CHAR_WIDTH + LABEL_PADDING_X * 2;
         sb.append("<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"white\"/>"
             .formatted(LABEL_PADDING_X, -FONT_SIZE / 2, labelWidth, FONT_SIZE + LABEL_PADDING_Y));
-        // Label text
         int textY = LABEL_PADDING_Y + FONT_SIZE * 4 / 5 - FONT_SIZE / 2;
         sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\">%s</text>"
             .formatted(LABEL_PADDING_X * 2, textY, FONT_SIZE, label));
@@ -89,7 +90,7 @@ public final class PackageGroupBox implements SvgElement {
         return sb.toString();
     }
 
-    private static String sketchyLine(int x1, int y1, int x2, int y2, java.util.Random rng) {
+    private static String sketchyLine(int x1, int y1, int x2, int y2, Random rng) {
         double wobble = rng.nextDouble() * SKETCH_MAX * 2 - SKETCH_MAX;
         int mx = (x1 + x2) / 2;
         int my = (y1 + y2) / 2;

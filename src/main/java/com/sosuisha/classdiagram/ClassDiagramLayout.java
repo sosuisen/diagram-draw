@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -464,6 +465,10 @@ public class ClassDiagramLayout {
             currentGroupX += dims.width() + groupGap;
         }
 
+        // Render order: outer rectangles must be drawn first so deeper (nested) ones
+        // sit on top. layoutPackageNode appends innermost-first (post-order recursion);
+        // reverse the list so the outermost ends up first in SVG output.
+        Collections.reverse(result);
         return result;
     }
 

@@ -2,10 +2,10 @@
 
 ## 概要
 
-コンポジション・集約・実現（implements）関係を自動検出してクラス図を生成するJava Mavenライブラリ。
-コンパイル済み `.class` ファイルをJava Class-File APIで解析し、UML標準表記のSVGを出力する。
+コンポジション・集約・実現（implements）・依存関係を自動検出してクラス図を生成する Java Maven ライブラリ。
+コンパイル済み `.class` ファイルを Java Class-File API で解析し、UML 標準表記のスケッチ風 SVG を出力する。
 
-- **Maven座標**: `com.sosuisha:classdiagram-maven-plugin`
+- **Maven 座標**: `com.sosuisha:classdiagram-maven-plugin`
 - **Java**: 25+
 
 ---
@@ -17,6 +17,7 @@ com.sosuisha.classdiagram
 ├── SvgElement.java              インターフェース: SVG描画要素
 ├── ClassStereotype.java         ステレオタイプ列挙型（NONE, INTERFACE）
 ├── ClassBox.java                クラスボックス（SVG要素）
+├── PackageGroupBox.java         パッケージ矩形（UMLタブ付きフォルダ形状、SVG要素）
 ├── Dependency.java              関係線（SVG要素）
 ├── DependencyType.java          関係の種類（列挙型）
 ├── SVGBuilder.java              SVGドキュメントビルダー
@@ -24,10 +25,10 @@ com.sosuisha.classdiagram
 ├── ClassDiagramLayout.java      レイアウトエンジン
 ├── ClassDiagramGenerator.java   ファサード（一括生成API）
 └── analyzer/
-    ├── ClassInfo.java           クラス識別子（final class）
-    ├── ClassRelation.java       クラス間関係（record）
-    ├── ClassRelationScanner.java .classファイルスキャナー
-    ├── ClassRelationSorter.java  トポロジカルソーター
+    ├── ClassInfo.java                 クラス識別子（final class）
+    ├── ClassRelation.java             クラス間関係（record）
+    ├── ClassRelationScanner.java      .classファイルスキャナー
+    ├── ClassRelationSorter.java       トポロジカルソーター
     ├── ConnectedComponentSplitter.java 連結成分分割器
     └── CircularRelationException.java 循環参照例外
 ```
@@ -61,24 +62,27 @@ public interface SvgElement {
 
 ### `DependencyType` 列挙型
 
-クラス間の依存関係の種類。
+クラス間の関係の種類。
 
 | 値 | 意味 | SVG表現 |
 |----|------|---------|
-| `COMPOSITION` | コンポジション（強い所有関係） | 塗りつぶしダイアモンド＋線 |
-| `AGGREGATION` | 集約（弱い所有関係） | 白抜きダイアモンド＋線 |
+| `COMPOSITION` | コンポジション（強い所有関係） | 塗りつぶしダイアモンド＋曲線 |
+| `AGGREGATION` | 集約（弱い所有関係） | 白抜きダイアモンド＋曲線 |
 | `REALIZATION` | 実現（implements関係） | 破線＋白抜き三角 |
+| `DEPENDENCY` | 依存（ローカル変数・メソッドパラメータ経由の使用関係） | 破線＋開いた矢頭（V字） |
 
 ---
 
 ### `ClassBox` クラス
 
-UMLクラスボックスを表す。`SvgElement` を実装。
+UML クラスボックスを表す。`SvgElement` を実装した `final class`。
 
 - 名前・フィールド・メソッドの3コンパートメント構造
-- 内容（名前・フィールド・メソッド）は構築後イミュータブル
-- 幅・高さはコンテンツから自動計算される
-- 描画位置は `setPosition()` で設定する（デフォルト: 原点）
+- 内容（ステレオタイプ・名前・フィールド・メソッド）は構築後イミュータブル
+- **デフォルトはクラス名のみ表示（`classNameOnly` モード）**。`showDetails()` で詳細表示に切り替える
+- 描画位置は `setPosition()` で設定（デフォルト: 原点）
+- 幅・高さはコンテンツから自動計算
+- 輪郭線・区切り線はコンテンツのハッシュを種としたゆらぎを持つスケッチ風パス
 
 #### API
 
@@ -88,11 +92,19 @@ new ClassBox("MyClass", ClassStereotype.INTERFACE)
 new ClassBox("MyClass", List.of("id: Long"), List.of("getId(): Long"))
 new ClassBox("MyClass", ClassStereotype.INTERFACE, List.of(), List.of())
 
-ClassStereotype s = box.stereotype();
-int w = box.width();
-int h = box.height();
 box.setPosition(50, 60);
-String name = box.name();
+box.setFillColor("#FFFFBB");          // null で塗りなし
+box.setStrokeColor("#000000");        // 枠線色（デフォルト #000000）
+box.showDetails();                    // 詳細表示モードに切り替え（自分自身を返す）
+box.picturesque(true);                // 装飾的描画（二重線）を有効化（自分自身を返す）
+
+box.stereotype();                     // ClassStereotype
+box.name();                           // String
+box.fields();                         // List<String>（不変）
+box.methods();                        // List<String>（不変）
+box.x(); box.y();                     // 位置
+box.width(); box.height();            // サイズ
+box.fillColor(); box.strokeColor();   // 色
 ```
 
 #### `draw()` の出力構造
@@ -100,16 +112,18 @@ String name = box.name();
 ```xml
 <g data-diagram-draw="box" data-diagram-draw-type="class" data-diagram-draw-name="{name}"
    transform="translate(x,y)">
-  <!-- 輪郭線4本（スケッチ風パス） -->
-  <text x="{cx}" y="{textY}" font-size="14" text-anchor="middle">{name}</text>
-  <!-- 区切り線1 -->
-  <!-- フィールドテキスト（0個以上） -->
-  <!-- 区切り線2 -->
-  <!-- メソッドテキスト（0個以上） -->
+  <!-- fillColor 設定時のみ: <rect width=w height=h fill=fillColor/> -->
+  <!-- 輪郭線4本（スケッチ風パス、picturesque=true で二重線） -->
+  <!-- 名前コンパートメント（INTERFACE時はステレオタイプ行を上に追加） -->
+  <!-- showDetails 時のみ:
+       区切り線1
+       フィールドテキスト（0個以上）
+       区切り線2
+       メソッドテキスト（0個以上） -->
 </g>
 ```
 
-`setPosition()` 未呼び出しの場合、`transform` は省略される。
+`x = 0 && y = 0` の場合は `transform` 属性が省略される。
 
 #### サイズ自動計算
 
@@ -120,53 +134,145 @@ String name = box.name();
 | `LINE_GAP` | 4 | 複数行の行間（px） |
 | `PADDING_X` | 8 | 左右の余白（px） |
 | `PADDING_Y` | 4 | コンパートメント上下の余白（px） |
+| `NAME_ONLY_PADDING_Y` | 6 | 名前のみ表示時の上下余白（px） |
 | `MIN_WIDTH` | 100 | 最小幅（px） |
 
-- **コンパートメント高さ**: `n * FONT_SIZE + (n-1) * LINE_GAP + PADDING_Y * 2`（n行; n=0は `PADDING_Y * 2`）
-- **幅**: 最長テキスト長 × `CHAR_WIDTH` + `PADDING_X * 2`（最小 `MIN_WIDTH`）
+- **幅**: 表示行の最大文字数 × `CHAR_WIDTH` + `PADDING_X * 2`（最小 `MIN_WIDTH`）
+  - `classNameOnly` モード: 名前とステレオタイプのみ評価
+  - `showDetails` モード: 名前・ステレオタイプ・フィールド・メソッドすべて評価
+- **コンパートメント高さ**:
+  - `showDetails` モード: `n * FONT_SIZE + (n-1) * LINE_GAP + PADDING_Y * 2`（n=0 のとき `PADDING_Y * 2`）
+  - `classNameOnly` モード: `n * FONT_SIZE + (n-1) * LINE_GAP + NAME_ONLY_PADDING_Y * 2`
+
+#### スケッチ表現
+
+- 各辺は2本のベジエ曲線で `wobble` 量だけ揺らぐ
+- 揺らぎ量は `sketchMax` で制御:
+  - `classNameOnly` あるいは詳細表示でもフィールド／メソッドなし: `1.0`
+  - フィールドかメソッドのみ存在: `1.5`
+  - 両方存在: `2.0`
+- `picturesque(true)` 時は輪郭線を 1px シフトした2本目のスケッチ線で重ね描き（手描きの重ね書きを模倣）
+
+---
+
+### `PackageGroupBox` クラス
+
+サブパッケージのクラス群を囲む UML 標準のタブ付きフォルダ形状を描画する。`SvgElement` を実装した `final class`。
+
+- 位置・寸法・ラベル・色は構築後イミュータブル
+- 上部にタブ領域（高さ `TAB_HEIGHT = FONT_SIZE + LABEL_PADDING_Y * 2 = 20px`）、その下に本体矩形
+- タブ幅 = `min(label幅 + LABEL_PADDING_X * 2, 本体幅)`
+- 輪郭はクロックワイズに7線（タブ右辺のみ直線、他はスケッチ風）
+
+#### API
+
+```java
+new PackageGroupBox(label, x, y, width, height)                                            // 塗りなし
+new PackageGroupBox(label, x, y, width, height, fillColor)                                 // 塗りつぶし指定
+new PackageGroupBox(label, x, y, width, height, fillColor, picturesque)                    // 影付き
+new PackageGroupBox(label, x, y, width, height, fillColor, picturesque, strokeColor)       // 枠線色も指定
+
+box.label(); box.x(); box.y(); box.width(); box.height();
+box.fillColor(); box.picturesque(); box.strokeColor();
+```
+
+#### `draw()` の出力構造
+
+```xml
+<g data-diagram-draw="package-group" data-diagram-draw-name="{label}" transform="translate(x,y)">
+  <!-- fillColor 指定時: タブ+本体の輪郭をなぞる polygon を塗りなし枠線で先に描画 -->
+  <!-- タブ上辺（スケッチ） -->
+  <!-- タブ右辺（直線。短いため揺らぎ不自然） -->
+  <!-- 本体上辺（タブ右） / 本体右辺 / 本体下辺 / 左辺 -->
+  <!-- picturesque=true: 右下隅から左上方向に5本の影線（後半は破線化） -->
+  <text x="LABEL_PADDING_X" y="..." font-size="12">{label}</text>
+</g>
+```
+
+| 定数 | 値 |
+|------|----|
+| `FONT_SIZE` | 12 |
+| `LABEL_PADDING_X` | 6 |
+| `LABEL_PADDING_Y` | 4 |
+| `TAB_HEIGHT` | 20 |
+| `SHADOW_LINE_COUNT` | 5 |
+| `SHADOW_START_OFFSET` | 2 |
+| `SHADOW_LINE_GAP` | 4 |
+| `SKETCH_MAX` | 1.5 |
 
 ---
 
 ### `Dependency` クラス
 
-UML関係線を表す。`SvgElement` を実装。
+UML 関係線を表す。`SvgElement` を実装した `final class`。
 
 ```java
 new Dependency(ClassBox source, ClassBox target, DependencyType type)
+
+dep.edgeColor("#000000");                        // メソッドチェーン可
+dep.setSourceAnchor(x, y, dirX, dirY);            // 端点と出口方向を手動指定（任意）
+dep.setTargetAnchor(x, y, dirX, dirY);            // 端点と入口方向を手動指定（任意）
+
+dep.source(); dep.target(); dep.type();
 ```
 
-- `source`: 所有側（コンポジション/集約）または実装クラス（実現）
-- `target`: 所有される側または インタフェース（実現）
+- `source`: 所有側（コンポジション/集約）、実装クラス（実現）、依存元（依存）
+- `target`: 所有される側、インタフェース（実現）、依存先（依存）
+- **アンカー API**: `ClassDiagramLayout` が同一辺を共有する複数エッジを分散配置するために使用する。未設定時は中心レイ法でソース／ターゲットの辺と交差する点を自動計算する
+- 内部列挙型 `BoxEdge { TOP, RIGHT, BOTTOM, LEFT }`
 
 #### `draw()` の出力構造
 
 ```xml
 <g data-diagram-draw="dependency" data-diagram-draw-type="{type}">
-  <!-- COMPOSITION/AGGREGATION: ダイアモンド(polygon) + 線(line) -->
-  <!-- REALIZATION: 破線(line stroke-dasharray) + 白抜き三角(polygon fill=white) -->
+  <!-- COMPOSITION / AGGREGATION:
+       <polygon ... fill="(edgeColor|white)"/>  ダイアモンド
+       <path d="M ... C ..." fill="none"/>       三次ベジエ曲線 -->
+  <!-- REALIZATION:
+       <path d="M ... C ..." stroke-dasharray="8,4"/>  破線曲線
+       <polygon ... fill="white"/>                      白抜き三角 -->
+  <!-- DEPENDENCY:
+       <path d="M ... C ..." stroke-dasharray="8,4"/>  破線曲線
+       <polyline points="..."/>                          V字の開いた矢頭 -->
 </g>
 ```
 
-`data-diagram-draw-type` の値: `"composition"` / `"aggregation"` / `"realization"`
+`data-diagram-draw-type` の値: `"composition"` / `"aggregation"` / `"realization"` / `"dependency"`
 
-#### 描画アルゴリズム概要
+#### 描画アルゴリズム
 
-1. `source` 中心 → `target` 中心の方向ベクトルを正規化
-2. `source` ボックス辺との交差点 `sp`、`target` ボックス辺との交差点 `tp` を求める
-3. **COMPOSITION/AGGREGATION**: `sp` 付近にダイアモンドを描画し、`tp` まで線を引く
-4. **REALIZATION**: `sp` から破線を引き、`tp`（インタフェース辺）に向かう白抜き三角を描画
+1. ソース中心 → ターゲット中心の方向ベクトルを正規化
+2. ソース／ターゲット双方の辺との交差点（または手動アンカー）を取得
+3. 各端点における外向き法線方向を取得し、それを出入口方向とする
+4. 三次ベジエ曲線で両端を接続。両端の制御点は外向き法線方向に
+   `max(CURVE_OFFSET_MIN=20, max(|exitProj|, |entryProj|) * CURVE_OFFSET_RATIO=1/3)` だけ突き出す
+5. 関係種別ごとに頭端の装飾（ダイアモンド／白抜き三角／矢頭）を描く
+   - COMPOSITION/AGGREGATION: ソース辺上の交点からダイアモンドを外向きに配置（後端＝交点、前端から曲線開始）
+   - REALIZATION: ターゲット辺の交点を頂点とする三角を曲線の入射方向に配置
+   - DEPENDENCY: ターゲット辺の交点で `±30°` 開いた長さ10 px の V 字矢頭を描画
+
+| 定数 | 値 |
+|------|----|
+| `DIAMOND_HALF_LEN` | 10 |
+| `DIAMOND_HALF_WIDTH` | 5 |
+| `TRIANGLE_LEN` | 16 |
+| `TRIANGLE_HALF_WIDTH` | 6 |
+| `ARROWHEAD_LEN` | 10 |
+| `ARROWHEAD_HALF_ANGLE` | π/6（30°） |
+| `CURVE_OFFSET_MIN` | 20 |
+| `CURVE_OFFSET_RATIO` | 1/3 |
 
 ---
 
 ### `SVGBuilder` クラス
 
-SVGドキュメントを構築するビルダー。
+SVG ドキュメントを構築するビルダー。
 
 ```java
-public SVGBuilder(int width, int height)
-public SVGBuilder fontFamily(String fontFamily)  // フォント設定（オプション）
-public SVGBuilder add(SvgElement element)         // 要素追加（メソッドチェーン可）
-public String build()                             // SVG文字列を返す
+public SVGBuilder(int width, int height)             // width/height は正数必須
+public SVGBuilder fontFamily(String fontFamily)       // フォント設定（オプション）
+public SVGBuilder add(SvgElement element)             // 要素追加（メソッドチェーン可）
+public String build()                                 // SVG文字列を返す
 ```
 
 #### `build()` の出力構造
@@ -181,27 +287,29 @@ public String build()                             // SVG文字列を返す
 
 ---
 
-## analyzerサブパッケージ
+## analyzer サブパッケージ
 
 `.class` ファイルを解析してクラス間関係を抽出する。Java Class-File API を使用（リフレクション不使用）。
 
 ### `ClassInfo` クラス
 
-クラスのパッケージ名と単純名を保持する識別子。`final class` として実装。
+クラスのパッケージ名・単純名・ステレオタイプを保持する識別子。`final class` として実装。
 
 ```java
-public ClassInfo(String packageName, String simpleName)
-public ClassInfo(String packageName, String simpleName, ClassStereotype stereotype)
+new ClassInfo(packageName, simpleName)                          // stereotype = NONE
+new ClassInfo(packageName, simpleName, stereotype)
 
-// 完全修飾名から生成（stereotype = NONE, groupIndex = 0）
 ClassInfo.fromFullyQualifiedName("com.example.Order")
 ClassInfo.fromFullyQualifiedName("com.example.IService", ClassStereotype.INTERFACE)
 
-int idx = info.groupIndex();   // デフォルト 0
-info.setGroupIndex(1);         // ConnectedComponentSplitter が呼び出す
+info.packageName(); info.simpleName(); info.stereotype();
+info.groupIndex();                                              // デフォルト 0
+info.setGroupIndex(1);                                          // ConnectedComponentSplitter が設定
+info.addDependencyTargetFqn("com.example.Helper");              // ClassRelationScanner が設定
+info.dependencyTargetFqns();                                    // 不変 Set<String>
 ```
 
-`equals`/`hashCode` は `packageName + simpleName + stereotype` のみ（`groupIndex` 除外）。
+`equals` / `hashCode` は `packageName + simpleName + stereotype` のみ（`groupIndex` および `dependencyTargetFqns` は同一性に含まれない）。
 
 ---
 
@@ -211,47 +319,72 @@ info.setGroupIndex(1);         // ConnectedComponentSplitter が呼び出す
 
 ```java
 public record ClassRelation(
-    ClassInfo sourceClassInfo,  // 所有側または実装クラス
-    ClassInfo targetClassInfo,  // 所有される側またはインタフェース
+    ClassInfo sourceClassInfo,  // 所有側・実装クラス・依存元
+    ClassInfo targetClassInfo,  // 所有される側・インタフェース・依存先
     DependencyType type,        // COMPOSITION / AGGREGATION / REALIZATION
-    boolean isMany              // Collectionフィールドの場合true（REALIZATIONは常にfalse）
+    boolean isMany              // Collectionフィールドの場合 true（REALIZATIONは常に false）
 )
 ```
+
+`DEPENDENCY` は `ClassRelation` としては保持されず、`ClassInfo.dependencyTargetFqns()` に格納される（同一連結成分内では描画されないため）。
 
 ---
 
 ### `ClassRelationScanner` クラス
 
-コンパイル済みクラスをスキャンして `ClassRelation` のリストを返す。
+コンパイル済みクラスをスキャンして `ClassRelation` のリストを返す。**2パス方式**:
+
+1. 第1パスで全クラスのステレオタイプ（INTERFACE か NONE か）を収集
+2. 第2パスで関係を構築
 
 ```java
 List<ClassRelation> scan(Path classRoot, String packageName)
 ```
 
-- 対象: `packageName` およびサブパッケージ内の `.class` ファイル（内部クラス `$` を除く）
-- **COMPOSITION**: フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数でない
-- **AGGREGATION**: フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数である
-- **REALIZATION**: `implements` でターゲットパッケージ内のインタフェースを実装している
-- コレクション型（`List<T>` 等）は `isMany=true`
-- 両クラスが同一パッケージ内に存在する場合のみ関係を生成
+#### スキャン対象
+
+- `packageName` およびサブパッケージ内の `.class` ファイル（内部クラス `$` を含むファイル名は除外）
+- パッケージディレクトリが存在しない場合は空リストを返す
+
+#### 検出する関係
+
+| 種別 | 条件 |
+|------|------|
+| **COMPOSITION** | フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数に同型がない |
+| **AGGREGATION** | フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数に同型がある |
+| **REALIZATION** | `implements` でターゲットパッケージ内のインタフェースを実装している |
+| **DEPENDENCY** | メソッドのパラメータ型／ジェネリックパラメータ／ローカル変数型がターゲットパッケージ内のクラス（自分自身およびフィールド型を除く） |
+
+- コレクション型（`List<T>` 等）のフィールドはジェネリック引数を見て `isMany = true`
+- 両クラスが同一スキャンパッケージ内に存在する場合のみ関係を生成
 
 #### 検出するコレクション型
 
 `Collection`, `List`, `Set`, `Queue`, `Deque`, `ArrayList`, `LinkedList`, `HashSet`, `LinkedHashSet`, `TreeSet`, `ArrayDeque`
 
+#### DEPENDENCY 検出元
+
+メソッドごとに以下を走査:
+
+1. メソッド記述子のパラメータ型（非ジェネリック）
+2. メソッド `Signature` 属性（ジェネリックパラメータ）
+3. `Code` 属性内の `LocalVariableTable`（非ジェネリック）
+4. `Code` 属性内の `LocalVariableTypeTable`（ジェネリック）
+
+自クラス自身およびフィールド型として既に検出されているクラスは除外。
+
 ---
 
 ### `ConnectedComponentSplitter` クラス
 
-`ClassRelation` のリストを走査して無向グラフの連結成分を検出し、
-各 `ClassInfo` の `groupIndex` を設定する。
+`ClassRelation` のリストを走査して無向グラフの連結成分を Union-Find で検出し、各 `ClassInfo` に `groupIndex` を設定する。
 
 ```java
 List<ClassRelation> split(List<ClassRelation> relations)
 ```
 
 - relations をそのまま返す（ClassInfo の groupIndex が書き換わっている）
-- 先頭から最初に出現した成分が groupIndex=0
+- relations 出現順で最初に現れた成分が `groupIndex = 0`
 - `@throws NullPointerException` relations が null の場合
 
 ---
@@ -264,10 +397,19 @@ List<ClassRelation> split(List<ClassRelation> relations)
 List<List<ClassInfo>> sort(List<ClassRelation> relations)
 ```
 
-- インデックス 0 が最上位レイヤー
-- **COMPOSITION/AGGREGATION**: source（所有側）が上位レイヤー、target（所有される側）が下位
-- **REALIZATION**: インタフェース（target）が上位レイヤー、実装クラス（source）が下位
-- 循環参照を検出した場合 `CircularRelationException` をスロー
+- インデックス 0 が最上位レイヤー（入次数 0 のクラス群）
+- **COMPOSITION / AGGREGATION**: source（所有側）が上位レイヤー、target（所有される側）が下位
+- **REALIZATION**: edge を反転し、interface（target）が上位、実装クラス（source）が下位
+- 同一レイヤー内は `simpleName → packageName` の辞書順
+- 重複辺は dedupe（`Set` 化）
+- 入次数の残るノードがある場合は `CircularRelationException` をスロー
+
+---
+
+### `CircularRelationException`
+
+`ClassRelationSorter` が循環参照を検出した際にスローする `RuntimeException`。
+メッセージに巻き込まれたクラスの単純名一覧を含める。
 
 ---
 
@@ -279,49 +421,109 @@ List<List<ClassInfo>> sort(List<ClassRelation> relations)
 
 ```java
 public record LayoutResult(
-    List<ClassBox> boxes,           // 位置設定済みClassBox一覧
-    List<Dependency> dependencies,  // 生成されたDependency一覧
+    List<ClassBox> boxes,                  // 位置設定済みClassBox一覧
+    List<Dependency> dependencies,         // 生成されたDependency一覧
+    List<PackageGroupBox> packageGroups,   // PackageGroupBox一覧（無効時は空リスト）
     int canvasWidth,
     int canvasHeight
 )
 ```
 
+後方互換用に `(boxes, dependencies, canvasWidth, canvasHeight)` の4引数コンストラクタも提供。`packageGroups` は空リスト扱い。
+
 ---
 
 ### `ClassDiagramLayout` クラス
 
-レイヤーと関係リストからレイアウト位置を計算する。
+レイヤーと関係リストからレイアウト位置を計算するエンジン。
 
 ```java
 public ClassDiagramLayout(int horizontalGap, int verticalGap,
                            int canvasPaddingX, int canvasPaddingY, int groupGap)
+
+// メソッドチェーン可な設定群
+.enableSubPackageGrouping(String rootPackage, int packageGap)
+.classFillColor(String hex)            // デフォルト #FFFFBB
+.interfaceFillColor(String hex)        // デフォルト #BDFFDE
+.packageFillColor(String hex)          // デフォルト #f0f0f0（階層が深いほど暗化）
+.packageStrokeColor(String hex)        // デフォルト #000000
+.classBoxStrokeColor(String hex)       // デフォルト #000000
+.edgeColor(String hex)                 // デフォルト #000000
+.showDetails()                         // クラスボックス詳細表示
+.picturesque(boolean)                  // 装飾的な描画
 
 LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 ```
 
 #### レイアウトアルゴリズム
 
-1. `groupIndex` ごとにサブレイヤーを構築（空レイヤーは除去）
-2. グループごとにコンテンツ幅・高さを計算
-3. グループを `groupGap` ピクセルの間隔で横並び配置（左→右）
-4. 各グループ内でレイヤーを中央揃え（グループ幅基準）
-5. 全グループを上揃え（y = `canvasPaddingY` から開始）
-6. キャンバス幅 = 全グループ幅合計 + `groupGap × (グループ数-1)` + `canvasPaddingX × 2`
-7. キャンバス高さ = 最も高いグループのコンテンツ高さ + `canvasPaddingY × 2`
+1. **ClassBox 生成**: 各 `ClassInfo` から `ClassBox` を生成し、ステレオタイプ・色・showDetails・picturesque を反映
+2. **辺交差の最小化（重心法）**:
+   - Sugiyama フレームワークのバリセンター法を上下交互に最大 12 パス実行
+   - 各ノードの重心 = 隣接レイヤー内のインデックスの平均値で並び替える
+   - REALIZATION は同一インタフェースを実装するクラスを連続ブロックとしてグループ化
+3. **groupIndex ごとのサブレイヤー構築**: 空レイヤーは除去
+4. **グループごとに**:
+   - 各サブレイヤーの幅（ボックス幅合計 + `horizontalGap × (n-1)`）と最大高さを計算
+   - グループのコンテンツ幅 = 最大レイヤー幅
+5. **グループ配置**: 横方向に `groupGap` 間隔で左→右に並べる
+6. **グループ内のボックス配置**: グループ幅基準で中央揃え、上→下に `verticalGap` 間隔
+7. **キャンバスサイズ計算**:
+   - 幅 = 全グループ幅合計 + `groupGap × (グループ数 - 1)` + `canvasPaddingX × 2`
+   - 高さ = 最も高いグループのコンテンツ高さ + `canvasPaddingY × 2`
+8. **Dependency 生成**: relations から `Dependency` を生成（edgeColor 適用）
+9. **クロスグループ DEPENDENCY 矢印生成**: `ClassInfo.dependencyTargetFqns()` から、別グループのターゲットへの `DEPENDENCY` を追加生成。ただし `srcInfo` が実装するインタフェースがそのターゲットを既に依存している場合は冗長として省略
+10. **サブパッケージグルーピング（オプション）**: 後述
+11. **エッジ端点の分散配置**: 同じ `(box, edge)` を共有する複数エッジの端点を辺上で等間隔に分散（自然交差順を保持）。`spreadDependencyEndpoints()` が `Dependency.setSourceAnchor()/setTargetAnchor()` を呼び出す
 
-グループが1つの場合は `groupGap` が使われず現在と同じ動作になる。
+#### サブパッケージグルーピング
+
+`enableSubPackageGrouping(rootPackage, packageGap)` を呼ぶと、ConnectedComponent 内をパッケージツリーに分解し再配置する:
+
+1. 各 ConnectedComponent のクラス群から `rootPackage` 基準の相対パスでパッケージツリーを構築
+2. ツリーを再帰的にレイアウト:
+   - 直接クラスは上部に1スロットとして縦配置（同じ元レイヤーインデックスのクラスを同一行に中央寄せ）
+   - 子ノード（サブパッケージ）はその下に **2D スカイラインの Bottom-Left fill** で詰め込み
+   - 子の挿入順は重心法でソート（兄弟間 relation の重心で並べる）
+3. 非ルートノード（`localLabel != ""`）は `PackageGroupBox` で囲む
+4. ルートパッケージのクラスは矩形なしで上端配置
+5. パッケージ矩形の塗り色は階層深度に応じて `factor = 0.9^(depth-1)` で暗化される
+
+| 定数 | 値 |
+|------|----|
+| `GROUP_PADDING_LEFT` | 15 |
+| `GROUP_PADDING_RIGHT` | 15 |
+| `GROUP_PADDING_TOP` | 25 |
+| `GROUP_PADDING_BOTTOM` | 10 |
+| `MAX_CROSSING_PASSES` | 12 |
+| `PACKAGE_DEPTH_DARKEN_FACTOR` | 0.9 |
+| `EDGE_SPREAD_MARGIN_MAX` | 20.0 |
+| `EDGE_SPREAD_MARGIN_RATIO` | 0.15 |
+
+`PackageGroupBox` はレンダリング順序として外側を先に描画する必要があるため、`layoutPackageNode` の post-order 蓄積結果を `Collections.reverse()` してから返す。
 
 ---
 
 ### `ClassDiagramGenerator` クラス
 
-スキャン → ソート → レイアウト → SVG生成のパイプラインをまとめたファサード。
+スキャン → 連結成分分割 → ソート → レイアウト → SVG 生成のパイプラインをまとめたファサード。
 
 ```java
 public ClassDiagramGenerator(int horizontalGap, int verticalGap,
                                int canvasPaddingX, int canvasPaddingY, int groupGap)
 
-public ClassDiagramGenerator fontFamily(String fontFamily)
+// メソッドチェーン可な設定群
+.fontFamily(String)
+.enableSubPackageGrouping(int packageGap)
+.classFillColor(String)
+.interfaceFillColor(String)
+.packageFillColor(String)
+.packageStrokeColor(String)
+.classBoxStrokeColor(String)
+.edgeColor(String)
+.showDetails()
+.picturesque(boolean)
+
 public String generate(Path classRoot, String packageName)
 ```
 
@@ -331,31 +533,41 @@ public String generate(Path classRoot, String packageName)
 ClassRelationScanner.scan()
         ↓ List<ClassRelation>
 ConnectedComponentSplitter.split()
-        ↓ List<ClassRelation>  (groupIndex 設定済み)
+        ↓ List<ClassRelation>  (ClassInfo.groupIndex 設定済み)
 ClassRelationSorter.sort()
         ↓ List<List<ClassInfo>>
 ClassDiagramLayout.layout()
-        ↓ LayoutResult
-SVGBuilder.build()
+        ↓ LayoutResult (boxes, dependencies, packageGroups, w, h)
+SVGBuilder
+  .add(packageGroups)
+  .add(boxes)
+  .add(dependencies)
+  .build()
         ↓ String (SVG)
 ```
 
-関係が0件の場合は空のSVGを返す。
+関係が0件の場合は `canvasPaddingX * 2` × `canvasPaddingY * 2` の空 SVG を返す。
+
+`enableSubPackageGrouping` は `ClassDiagramLayout` 側に `packageName` を渡して有効化する。
 
 ---
 
-## data属性の命名規則
+## data 属性の命名規則
 
 | 属性 | 説明 |
 |------|------|
-| `data-diagram-draw="background"` | 白背景矩形（SVGBuilderが自動挿入） |
+| `data-diagram-draw="background"` | 白背景矩形（SVGBuilder が自動挿入） |
 | `data-diagram-draw="box"` | クラスボックス |
 | `data-diagram-draw-type="class"` | クラスボックスの種別 |
-| `data-diagram-draw-name="{name}"` | クラス名 |
+| `data-diagram-draw-name="{name}"` | クラス名（ボックス）／パッケージラベル |
+| `data-diagram-draw="package-group"` | パッケージ矩形 |
+| `data-diagram-draw="package-shadow-solid"` | パッケージ右下隅影（実線） |
+| `data-diagram-draw="package-shadow-dashed"` | パッケージ右下隅影（破線） |
 | `data-diagram-draw="dependency"` | 関係線グループ |
 | `data-diagram-draw-type="composition"` | コンポジション関係線 |
 | `data-diagram-draw-type="aggregation"` | 集約関係線 |
 | `data-diagram-draw-type="realization"` | 実現（implements）関係線 |
+| `data-diagram-draw-type="dependency"` | 依存関係線 |
 
 ---
 
@@ -366,6 +578,12 @@ SVGBuilder.build()
 ```java
 String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
     .fontFamily("HackGen")
+    .enableSubPackageGrouping(20)
+    .classFillColor("#FFFFBB")
+    .interfaceFillColor("#BDFFDE")
+    .packageFillColor("#f0f0f0")
+    .showDetails()
+    .picturesque(true)
     .generate(Path.of("target/classes"), "com.example");
 ```
 
@@ -379,27 +597,35 @@ new ConnectedComponentSplitter().split(relations);
 
 var layers = new ClassRelationSorter().sort(relations);
 
-var result = new ClassDiagramLayout(30, 50, 30, 30, 60).layout(layers, relations);
+var result = new ClassDiagramLayout(30, 50, 30, 30, 60)
+    .enableSubPackageGrouping("com.example", 20)
+    .showDetails()
+    .picturesque(true)
+    .layout(layers, relations);
 
 var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight())
     .fontFamily("HackGen");
+result.packageGroups().forEach(builder::add);
 result.boxes().forEach(builder::add);
 result.dependencies().forEach(builder::add);
 String svg = builder.build();
 ```
 
-### ClassBoxとDependencyを直接組み合わせる
+### ClassBox と Dependency を直接組み合わせる
 
 ```java
-var order = new ClassBox("Order", List.of("id: Long"), List.of("getId(): Long"));
+var order = new ClassBox("Order", List.of("id: Long"), List.of("getId(): Long"))
+    .showDetails();
 order.setPosition(15, 75);
+order.setFillColor("#FFFFBB");
+
 var item = new ClassBox("Item");
 item.setPosition(200, 75);
 
 var svg = new SVGBuilder(400, 200)
     .add(order)
     .add(item)
-    .add(new Dependency(order, item, DependencyType.COMPOSITION))
+    .add(new Dependency(order, item, DependencyType.COMPOSITION).edgeColor("#444"))
     .build();
 ```
 
@@ -409,24 +635,87 @@ var svg = new SVGBuilder(400, 200)
 
 - 内部クラス・匿名クラス（`$` を含むクラス）は対象外
 - 配列フィールドは `isMany` 判定の対象外（コレクション型のみ）
-- 異なるパッケージ間の関係は生成しない（同一スキャンパッケージ内のみ）
+- 異なるスキャンパッケージ間の関係は生成しない（同一 `packageName` 配下のみ）
 - クラス継承（`extends`）は未対応
-- 静的フィールドは対象外
+- 静的フィールドの扱いは通常フィールドと同じ（COMPOSITION/AGGREGATION 判定の対象）
 
 ---
 
 ## 今後の予定
 
-### 辺交差の最小化（重心法）
+### intention DSL（作図意図の入力）
 
-同一レイヤー内のボックスの並び順を入れ替えることで、依存関係を表す線の交差数を最小化する。
+自動レイアウトでは表現しきれないユーザの作図意図（intention）を、独自の簡易 DSL で
+明示的に指定できるようにする。スキャナーが検出した関係に対して、レイアウトのヒントや
+描画の上書きを与える追加入力として扱う。PlantUML との互換は意図しない。
 
-**アルゴリズム**: Sugiyamaフレームワークの重心法（バリセンター法）を採用予定。
+文ごとに 1 行、行頭の動詞（`arrow` / `place` など）で文種を識別する。
+識別子は単純名で記述（必要に応じて完全修飾名）。
 
-- 各ノードの重心 = 隣接ノード（上位レイヤーまたは下位レイヤー）のレイヤー内インデックスの平均値
-- 重心値でソートし直すことで交差数を削減
-- 複数パス（上→下、下→上を交互）繰り返すことで収束させる
-- 計算量: O(passes × E)、NP困難な厳密最適化の近似として実用的
+#### 第一段階: 矢印アンカー指定文 `arrow A B from bottom`
 
-**実装方針**: `ClassDiagramLayout` に private メソッド `minimizeCrossings()` を追加し、Step 1（ボックスマップ作成）の直後に呼び出す。
+`A` から `B` への依存矢印（`Dependency`）について、`A` 側の出発辺を指定する。
 
+- 構文: `arrow <source> <target> from <edge>`
+- 辺トークン（名詞形）: `top` / `bottom` / `left` / `right`
+  - `from top` → ソースの上辺から
+  - `from bottom` → ソースの下辺から
+  - `from left` → ソースの左辺から
+  - `from right` → ソースの右辺から
+- 意味: 該当 `Dependency` の `setSourceAnchor()` を辺中央で呼び出し、`Dependency.draw()` の
+  中心レイ法による交点計算を上書きする。ターゲット側のアンカーは未指定（自動計算）。
+- 将来的に `to <edge>` を追記してターゲット辺も指定可能にする想定:
+  `arrow A B from bottom to top`
+
+例:
+
+```
+arrow Order Item from bottom
+arrow Service Repository from right
+```
+
+##### 想定する適用ポイント
+
+- ジェネレーター/レイアウトに intention 入力を渡す API を追加（パス指定または文字列入力）
+- レイアウト計算後の `Dependency` リストに対して、intention をマッチさせてアンカーを上書き
+- `spreadDependencyEndpoints()` との競合は、intention 由来のアンカーを優先（分散対象から除外）
+
+#### 第二段階: 配置制約文 `place B below A`
+
+`B` を必ず `A` の指定方向に配置するレイアウト制約。関係（`Dependency`）を生成しない、
+純粋な配置ヒントとして扱う。
+
+- 構文: `place <target> <direction> <reference>`
+- 方向トークン（前置詞・前置詞句）: `above` / `below` / `right of` / `left of`
+  - `above A` → A の上側に配置
+  - `below A` → A の下側に配置
+  - `right of A` → A の右側に配置
+  - `left of A` → A の左側に配置
+- 意味: トポロジカルソートおよびバリセンター順序決定の後、`ClassDiagramLayout` の
+  座標確定前に制約を満たすよう `ClassBox` の配置順／レイヤーを調整する。
+- 既存の自動レイアウトと衝突した場合は intention を優先。
+
+例:
+
+```
+place Item below Order
+place Repository right of Service
+```
+
+将来的に絶対座標版 `place B at (100, 50)` への拡張も検討する。
+
+#### 語彙の使い分け
+
+| 用途 | 語彙 | 例 |
+|------|------|-----|
+| 配置（B と A の相対位置） | 前置詞句 `above` / `below` / `right of` / `left of` | `place B below A` |
+| 矢印アンカー（A のどの辺から出すか） | 名詞 `top` / `bottom` / `left` / `right` | `arrow A B from bottom` |
+
+配置文で `from below A` と書くと「A の下から来る」と誤読されやすく、矢印文で `from below` も
+同様に紛らわしい。配置は B から見た方向、アンカーは A の辺、と読み方が変わるため、別語彙を採用する。
+
+#### 後続で検討する構文（未確定）
+
+- ターゲット側辺の指定: `arrow A B from bottom to top`
+- 関係種別の明示: `arrow A B kind=composition`（`aggregation` / `realization` / `dependency`）
+- 色やラベルの上書き

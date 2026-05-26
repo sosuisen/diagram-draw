@@ -962,13 +962,9 @@ public class ClassDiagramLayout {
             orderedLayers.remove(targetIdx);
             if (refIdx > targetIdx) refIdx--;
         }
-        if (refIdx > 0) {
-            orderedLayers.get(refIdx - 1).add(target);
-        } else {
-            var newLayer = new ArrayList<ClassInfo>();
-            newLayer.add(target);
-            orderedLayers.add(0, newLayer);
-        }
+        var newLayer = new ArrayList<ClassInfo>();
+        newLayer.add(target);
+        orderedLayers.add(refIdx, newLayer);
     }
 
     private void applyRightOf(List<List<ClassInfo>> orderedLayers,

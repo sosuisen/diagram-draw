@@ -530,7 +530,7 @@ class ClassDiagramLayoutTest {
                 .intention("place Unknown below A")
                 .layout(layers, rels));
         assertEquals(1, ex.lineNumber());
-        assertTrue(ex.getMessage().contains("Unknown"));
+        assertTrue(ex.getMessage().contains("unknown class: 'Unknown'"));
     }
 
     @Test
@@ -544,7 +544,7 @@ class ClassDiagramLayoutTest {
                 .intention("place A below Ghost")
                 .layout(layers, rels));
         assertEquals(1, ex.lineNumber());
-        assertTrue(ex.getMessage().contains("Ghost"));
+        assertTrue(ex.getMessage().contains("unknown class: 'Ghost'"));
     }
 
     @Test

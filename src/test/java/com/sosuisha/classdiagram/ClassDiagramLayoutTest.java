@@ -599,4 +599,69 @@ class ClassDiagramLayoutTest {
         var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
         assertTrue(boxA.y() > boxB.y(), "A must be below B after constraint loaded from file");
     }
+
+    @Test
+    void intentionArrowFromBottomLocksSourceAnchor() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("arrow A B from bottom")
+            .layout(layers, rels);
+        var dep = result.dependencies().stream()
+            .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
+            .findFirst().orElseThrow();
+        assertTrue(dep.isSourceAnchorLocked(), "source anchor must be locked by intention");
+        assertFalse(dep.isTargetAnchorLocked(), "target anchor must not be locked when 'to' is omitted");
+    }
+
+    @Test
+    void intentionArrowFromBottomToTopLocksBothAnchors() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("arrow A B from bottom to top")
+            .layout(layers, rels);
+        var dep = result.dependencies().stream()
+            .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
+            .findFirst().orElseThrow();
+        assertTrue(dep.isSourceAnchorLocked(), "source anchor must be locked");
+        assertTrue(dep.isTargetAnchorLocked(), "target anchor must be locked");
+    }
+
+    @Test
+    void intentionArrowThrowsForNoRelation() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var ex = assertThrows(
+            com.sosuisha.classdiagram.intention.IntentionParseException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60)
+                .intention("arrow B A from bottom")  // B→A does not exist
+                .layout(layers, rels));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("no relation"));
+        assertTrue(ex.getMessage().contains("'B'"));
+        assertTrue(ex.getMessage().contains("'A'"));
+    }
+
+    @Test
+    void intentionArrowAppliesToAllMatchingRelations() {
+        // A→B exists as both COMPOSITION and AGGREGATION — both should be locked
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(
+            rel(a, b),
+            new ClassRelation(a, b, DependencyType.AGGREGATION, false)
+        );
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("arrow A B from bottom")
+            .layout(layers, rels);
+        var locked = result.dependencies().stream()
+            .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
+            .filter(Dependency::isSourceAnchorLocked)
+            .count();
+        assertEquals(2, locked, "both A→B relations must have locked source anchor");
+    }
 }

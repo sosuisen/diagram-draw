@@ -3,6 +3,7 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import com.sosuisha.classdiagram.intention.ArrowConstraint;
+import com.sosuisha.classdiagram.intention.ArrowEdge;
 import com.sosuisha.classdiagram.intention.IntentionDslParser;
 import com.sosuisha.classdiagram.intention.IntentionParseException;
 import com.sosuisha.classdiagram.intention.PlaceConstraint;
@@ -248,6 +249,7 @@ public class ClassDiagramLayout {
      * @return レイアウト計算結果
      * @throws NullPointerException layersまたはrelationsがnullの場合
      * @throws com.sosuisha.classdiagram.intention.IntentionParseException intention制約でエラーが発生した場合
+     * @throws com.sosuisha.classdiagram.intention.IntentionParseException arrow制約でエラーが発生した場合
      */
     public LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations) {
         Objects.requireNonNull(layers, "layers must not be null");
@@ -419,6 +421,7 @@ public class ClassDiagramLayout {
 
         // Step 10: spread endpoints of edges sharing the same (box, edge) slot so that
         // multiple incident edges don't bunch up at a single point.
+        applyArrowConstraints(dependencies);
         spreadDependencyEndpoints(dependencies);
 
         return new LayoutResult(
@@ -886,6 +889,49 @@ public class ClassDiagramLayout {
     ) {}
 
     private record EdgeKey(ClassBox box, Dependency.BoxEdge edge) {}
+
+    private void applyArrowConstraints(List<Dependency> dependencies) {
+        if (arrowConstraints.isEmpty()) return;
+        for (var constraint : arrowConstraints) {
+            var matched = dependencies.stream()
+                .filter(d -> d.source().name().equals(constraint.source())
+                          && d.target().name().equals(constraint.target()))
+                .toList();
+            if (matched.isEmpty()) {
+                throw new IntentionParseException(constraint.lineNumber(),
+                    "no relation from '" + constraint.source()
+                    + "' to '" + constraint.target() + "'");
+            }
+            for (var dep : matched) {
+                double[] fromPt  = edgeMidpoint(dep.source(), constraint.fromEdge());
+                double[] fromDir = edgeOutwardDir(constraint.fromEdge());
+                dep.lockSourceAnchor(fromPt[0], fromPt[1], fromDir[0], fromDir[1]);
+                if (constraint.toEdge() != null) {
+                    double[] toPt  = edgeMidpoint(dep.target(), constraint.toEdge());
+                    double[] toDir = edgeOutwardDir(constraint.toEdge());
+                    dep.lockTargetAnchor(toPt[0], toPt[1], toDir[0], toDir[1]);
+                }
+            }
+        }
+    }
+
+    private static double[] edgeMidpoint(ClassBox box, ArrowEdge edge) {
+        return switch (edge) {
+            case TOP    -> new double[]{ box.x() + box.width() / 2.0, box.y() };
+            case BOTTOM -> new double[]{ box.x() + box.width() / 2.0, box.y() + box.height() };
+            case LEFT   -> new double[]{ box.x(),                     box.y() + box.height() / 2.0 };
+            case RIGHT  -> new double[]{ box.x() + box.width(),       box.y() + box.height() / 2.0 };
+        };
+    }
+
+    private static double[] edgeOutwardDir(ArrowEdge edge) {
+        return switch (edge) {
+            case TOP    -> new double[]{ 0, -1 };
+            case BOTTOM -> new double[]{ 0,  1 };
+            case LEFT   -> new double[]{ -1, 0 };
+            case RIGHT  -> new double[]{ 1,  0 };
+        };
+    }
 
     private void applyPlaceConstraints(List<List<ClassInfo>> orderedLayers) {
         if (placeConstraints.isEmpty()) return;

@@ -1042,10 +1042,14 @@ public class ClassDiagramLayout {
             var tgtEdge = Dependency.whichEdge(tgt, tp[0], tp[1]);
             double srcNatural = (srcEdge == Dependency.BoxEdge.TOP || srcEdge == Dependency.BoxEdge.BOTTOM) ? sp[0] : sp[1];
             double tgtNatural = (tgtEdge == Dependency.BoxEdge.TOP || tgtEdge == Dependency.BoxEdge.BOTTOM) ? tp[0] : tp[1];
-            groups.computeIfAbsent(new EdgeKey(src, srcEdge), k -> new ArrayList<>())
-                .add(new AnchorInfo(dep, true, src, srcEdge, srcNatural));
-            groups.computeIfAbsent(new EdgeKey(tgt, tgtEdge), k -> new ArrayList<>())
-                .add(new AnchorInfo(dep, false, tgt, tgtEdge, tgtNatural));
+            if (!dep.isSourceAnchorLocked()) {
+                groups.computeIfAbsent(new EdgeKey(src, srcEdge), k -> new ArrayList<>())
+                    .add(new AnchorInfo(dep, true, src, srcEdge, srcNatural));
+            }
+            if (!dep.isTargetAnchorLocked()) {
+                groups.computeIfAbsent(new EdgeKey(tgt, tgtEdge), k -> new ArrayList<>())
+                    .add(new AnchorInfo(dep, false, tgt, tgtEdge, tgtNatural));
+            }
         }
 
         for (var entry : groups.entrySet()) {

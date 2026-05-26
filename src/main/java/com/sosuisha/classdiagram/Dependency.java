@@ -34,6 +34,8 @@ public final class Dependency implements SvgElement {
     private double[] customSourceDir;
     private double[] customTargetAnchor;
     private double[] customTargetDir;
+    private boolean sourceAnchorLocked = false;
+    private boolean targetAnchorLocked = false;
 
     /**
      * 依存関係を生成する。
@@ -95,6 +97,30 @@ public final class Dependency implements SvgElement {
         this.customTargetAnchor = new double[] { x, y };
         this.customTargetDir = new double[] { dirX, dirY };
     }
+
+    /**
+     * ソース端点と出口方向を intention 由来アンカーとして設定する。
+     * {@code spreadDependencyEndpoints()} の分散対象から除外される。
+     */
+    public void lockSourceAnchor(double x, double y, double dirX, double dirY) {
+        setSourceAnchor(x, y, dirX, dirY);
+        this.sourceAnchorLocked = true;
+    }
+
+    /**
+     * ターゲット端点と入口方向を intention 由来アンカーとして設定する。
+     * {@code spreadDependencyEndpoints()} の分散対象から除外される。
+     */
+    public void lockTargetAnchor(double x, double y, double dirX, double dirY) {
+        setTargetAnchor(x, y, dirX, dirY);
+        this.targetAnchorLocked = true;
+    }
+
+    /** @return ソースアンカーが intention によってロックされている場合 {@code true} */
+    public boolean isSourceAnchorLocked() { return sourceAnchorLocked; }
+
+    /** @return ターゲットアンカーが intention によってロックされている場合 {@code true} */
+    public boolean isTargetAnchorLocked() { return targetAnchorLocked; }
 
     /**
      * 依存関係のSVG表現を返す。

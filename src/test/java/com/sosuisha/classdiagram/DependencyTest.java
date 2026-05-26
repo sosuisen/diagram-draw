@@ -172,4 +172,30 @@ class DependencyTest {
     void drawDependencyHasNoFilledDiamond() {
         assertFalse(dependencyDep().draw().contains("fill=\"#000000\""));
     }
+
+    @Test
+    void sourceAnchorNotLockedByDefault() {
+        var dep = dep(DependencyType.COMPOSITION);
+        assertFalse(dep.isSourceAnchorLocked());
+    }
+
+    @Test
+    void targetAnchorNotLockedByDefault() {
+        var dep = dep(DependencyType.COMPOSITION);
+        assertFalse(dep.isTargetAnchorLocked());
+    }
+
+    @Test
+    void lockSourceAnchorSetsFlag() {
+        var dep = dep(DependencyType.COMPOSITION);
+        dep.lockSourceAnchor(50, 0, 0, -1);
+        assertTrue(dep.isSourceAnchorLocked());
+    }
+
+    @Test
+    void lockTargetAnchorSetsFlag() {
+        var dep = dep(DependencyType.COMPOSITION);
+        dep.lockTargetAnchor(50, 200, 0, 1);
+        assertTrue(dep.isTargetAnchorLocked());
+    }
 }

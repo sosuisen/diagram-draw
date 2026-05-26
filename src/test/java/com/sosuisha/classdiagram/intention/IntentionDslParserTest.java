@@ -221,4 +221,121 @@ class IntentionDslParserTest {
         assertThrows(UnsupportedOperationException.class,
             () -> result.arrowConstraints().add(null));
     }
+
+    // --- arrow parsing ---
+
+    @Test
+    void parsesArrowFromOnly() {
+        var result = parser.parse("arrow A B from bottom");
+        assertEquals(0, result.placeConstraints().size());
+        assertEquals(1, result.arrowConstraints().size());
+        var c = result.arrowConstraints().get(0);
+        assertEquals("A", c.source());
+        assertEquals("B", c.target());
+        assertEquals(ArrowEdge.BOTTOM, c.fromEdge());
+        assertNull(c.toEdge());
+        assertEquals(1, c.lineNumber());
+    }
+
+    @Test
+    void parsesArrowFromTop() {
+        var result = parser.parse("arrow X Y from top");
+        assertEquals(ArrowEdge.TOP, result.arrowConstraints().get(0).fromEdge());
+    }
+
+    @Test
+    void parsesArrowFromLeft() {
+        var result = parser.parse("arrow X Y from left");
+        assertEquals(ArrowEdge.LEFT, result.arrowConstraints().get(0).fromEdge());
+    }
+
+    @Test
+    void parsesArrowFromRight() {
+        var result = parser.parse("arrow X Y from right");
+        assertEquals(ArrowEdge.RIGHT, result.arrowConstraints().get(0).fromEdge());
+    }
+
+    @Test
+    void parsesArrowFromBottomToTop() {
+        var result = parser.parse("arrow A B from bottom to top");
+        var c = result.arrowConstraints().get(0);
+        assertEquals(ArrowEdge.BOTTOM, c.fromEdge());
+        assertEquals(ArrowEdge.TOP, c.toEdge());
+    }
+
+    @Test
+    void parsesArrowFromRightToLeft() {
+        var result = parser.parse("arrow A B from right to left");
+        var c = result.arrowConstraints().get(0);
+        assertEquals(ArrowEdge.RIGHT, c.fromEdge());
+        assertEquals(ArrowEdge.LEFT, c.toEdge());
+    }
+
+    @Test
+    void parsesMixedPlaceAndArrow() {
+        var result = parser.parse("place A below B\narrow A B from bottom");
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(1, result.arrowConstraints().size());
+        assertEquals(PlaceDirection.BELOW, result.placeConstraints().get(0).direction());
+        assertEquals(ArrowEdge.BOTTOM, result.arrowConstraints().get(0).fromEdge());
+        assertEquals(1, result.placeConstraints().get(0).lineNumber());
+        assertEquals(2, result.arrowConstraints().get(0).lineNumber());
+    }
+
+    @Test
+    void arrowReturnsImmutableList() {
+        var result = parser.parse("arrow A B from bottom");
+        assertThrows(UnsupportedOperationException.class,
+            () -> result.arrowConstraints().add(null));
+    }
+
+    @Test
+    void throwsForArrowMissingFromKeyword() {
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B bottom"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("invalid arrow statement"));
+    }
+
+    @Test
+    void throwsForArrowTooFewTokens() {
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("invalid arrow statement"));
+    }
+
+    @Test
+    void throwsForArrowUnknownFromEdge() {
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B from side"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("unknown edge: 'side'"));
+    }
+
+    @Test
+    void throwsForArrowUnknownToEdge() {
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B from bottom to side"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("unknown edge: 'side'"));
+    }
+
+    @Test
+    void throwsForArrowMissingToKeyword() {
+        // 6 tokens: arrow A B from bottom top (missing "to" keyword)
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B from bottom top"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("invalid arrow statement"));
+    }
+
+    @Test
+    void throwsForArrowExtraTokens() {
+        // 8+ tokens
+        var ex = assertThrows(IntentionParseException.class,
+            () -> parser.parse("arrow A B from bottom to top extra"));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("invalid arrow statement"));
+    }
 }

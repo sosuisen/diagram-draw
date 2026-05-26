@@ -3,6 +3,8 @@ package com.sosuisha.classdiagram.intention;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
+import com.sosuisha.classdiagram.intention.ArrowConstraint;
+import com.sosuisha.classdiagram.intention.ArrowEdge;
 
 class IntentionDslParserTest {
 
@@ -158,5 +160,41 @@ class IntentionDslParserTest {
         var ex = assertThrows(IntentionParseException.class,
             () -> parser.parse("place A below B\narrow X Y from top"));
         assertEquals(2, ex.lineNumber());
+    }
+
+    // --- ArrowConstraint ---
+
+    @Test
+    void arrowConstraintFieldsAreAccessible() {
+        var c = new ArrowConstraint("A", "B", ArrowEdge.BOTTOM, ArrowEdge.TOP, 2);
+        assertEquals("A", c.source());
+        assertEquals("B", c.target());
+        assertEquals(ArrowEdge.BOTTOM, c.fromEdge());
+        assertEquals(ArrowEdge.TOP, c.toEdge());
+        assertEquals(2, c.lineNumber());
+    }
+
+    @Test
+    void arrowConstraintToEdgeCanBeNull() {
+        var c = new ArrowConstraint("A", "B", ArrowEdge.BOTTOM, null, 1);
+        assertNull(c.toEdge());
+    }
+
+    @Test
+    void arrowConstraintNullSourceThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ArrowConstraint(null, "B", ArrowEdge.BOTTOM, null, 1));
+    }
+
+    @Test
+    void arrowConstraintNullTargetThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ArrowConstraint("A", null, ArrowEdge.BOTTOM, null, 1));
+    }
+
+    @Test
+    void arrowConstraintNullFromEdgeThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ArrowConstraint("A", "B", null, null, 1));
     }
 }

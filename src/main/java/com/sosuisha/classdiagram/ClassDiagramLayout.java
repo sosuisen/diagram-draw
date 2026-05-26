@@ -969,8 +969,25 @@ public class ClassDiagramLayout {
 
     private void applyRightOf(List<List<ClassInfo>> orderedLayers,
             ClassInfo target, ClassInfo ref, int lineNumber) {
-        // placeholder — implemented in Task 5
-        throw new UnsupportedOperationException("not yet implemented");
+        if (target.groupIndex() != ref.groupIndex()) {
+            throw new IntentionParseException(lineNumber,
+                "'" + target.simpleName() + "' and '" + ref.simpleName()
+                + "' are in different connected components");
+        }
+        int targetIdx = findLayerIndex(orderedLayers, target);
+        int refIdx = findLayerIndex(orderedLayers, ref);
+        if (targetIdx != refIdx) {
+            throw new IntentionParseException(lineNumber,
+                "'" + target.simpleName() + "' and '" + ref.simpleName()
+                + "' are not in the same layer");
+        }
+        var layer = orderedLayers.get(targetIdx);
+        int targetPos = layer.indexOf(target);
+        int refPos = layer.indexOf(ref);
+        if (targetPos > refPos) return;
+        layer.remove(targetPos);
+        refPos = layer.indexOf(ref);
+        layer.add(refPos + 1, target);
     }
 
     private void applyLeftOf(List<List<ClassInfo>> orderedLayers,

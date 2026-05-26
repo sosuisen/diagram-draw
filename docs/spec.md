@@ -24,13 +24,21 @@ com.sosuisha.classdiagram
 ├── LayoutResult.java            レイアウト計算結果（record）
 ├── ClassDiagramLayout.java      レイアウトエンジン
 ├── ClassDiagramGenerator.java   ファサード（一括生成API）
-└── analyzer/
-    ├── ClassInfo.java                 クラス識別子（final class）
-    ├── ClassRelation.java             クラス間関係（record）
-    ├── ClassRelationScanner.java      .classファイルスキャナー
-    ├── ClassRelationSorter.java       トポロジカルソーター
-    ├── ConnectedComponentSplitter.java 連結成分分割器
-    └── CircularRelationException.java 循環参照例外
+├── analyzer/
+│   ├── ClassInfo.java                 クラス識別子（final class）
+│   ├── ClassRelation.java             クラス間関係（record）
+│   ├── ClassRelationScanner.java      .classファイルスキャナー
+│   ├── ClassRelationSorter.java       トポロジカルソーター
+│   ├── ConnectedComponentSplitter.java 連結成分分割器
+│   └── CircularRelationException.java 循環参照例外
+└── intention/
+    ├── IntentionParseException.java   DSL構文エラー例外
+    ├── PlaceDirection.java            配置方向列挙型（ABOVE / BELOW / RIGHT_OF / LEFT_OF）
+    ├── PlaceConstraint.java           パース済み place 制約（record）
+    ├── ArrowEdge.java                 矢印アンカー辺列挙型（TOP / BOTTOM / LEFT / RIGHT）
+    ├── ArrowConstraint.java           パース済み arrow 制約（record）
+    ├── ParseResult.java               パーサー出力（PlaceConstraint + ArrowConstraint の両リスト）
+    └── IntentionDslParser.java        DSL パーサー
 ```
 
 ---
@@ -212,6 +220,11 @@ new Dependency(ClassBox source, ClassBox target, DependencyType type)
 dep.edgeColor("#000000");                        // メソッドチェーン可
 dep.setSourceAnchor(x, y, dirX, dirY);            // 端点と出口方向を手動指定（任意）
 dep.setTargetAnchor(x, y, dirX, dirY);            // 端点と入口方向を手動指定（任意）
+dep.lockSourceAnchor(x, y, dirX, dirY);           // intention 由来アンカーとして設定（spread 対象外）
+dep.lockTargetAnchor(x, y, dirX, dirY);           // intention 由来アンカーとして設定（spread 対象外）
+
+dep.isSourceAnchorLocked();                       // intention によってロックされているか
+dep.isTargetAnchorLocked();
 
 dep.source(); dep.target(); dep.type();
 ```
@@ -219,6 +232,7 @@ dep.source(); dep.target(); dep.type();
 - `source`: 所有側（コンポジション/集約）、実装クラス（実現）、依存元（依存）
 - `target`: 所有される側、インタフェース（実現）、依存先（依存）
 - **アンカー API**: `ClassDiagramLayout` が同一辺を共有する複数エッジを分散配置するために使用する。未設定時は中心レイ法でソース／ターゲットの辺と交差する点を自動計算する
+- **ロックアンカー API**: `lockSourceAnchor()` / `lockTargetAnchor()` で設定したアンカーは `spreadDependencyEndpoints()` の分散対象から除外される。intention DSL の `arrow` 制約が使用する
 - 内部列挙型 `BoxEdge { TOP, RIGHT, BOTTOM, LEFT }`
 
 #### `draw()` の出力構造
@@ -244,8 +258,9 @@ dep.source(); dep.target(); dep.type();
 1. ソース中心 → ターゲット中心の方向ベクトルを正規化
 2. ソース／ターゲット双方の辺との交差点（または手動アンカー）を取得
 3. 各端点における外向き法線方向を取得し、それを出入口方向とする
-4. 三次ベジエ曲線で両端を接続。両端の制御点は外向き法線方向に
-   `max(CURVE_OFFSET_MIN=20, max(|exitProj|, |entryProj|) * CURVE_OFFSET_RATIO=1/3)` だけ突き出す
+4. 三次ベジエ曲線で両端を接続。各端点の制御点は外向き法線方向に端点ごと個別に
+   `max(CURVE_OFFSET_MIN=20, |proj| * CURVE_OFFSET_RATIO=1/3)` だけ突き出す
+   （ソース側は exitProj、ターゲット側は entryProj を使用）
 5. 関係種別ごとに頭端の装飾（ダイアモンド／白抜き三角／矢頭）を描く
    - COMPOSITION/AGGREGATION: ソース辺上の交点からダイアモンドを外向きに配置（後端＝交点、前端から曲線開始）
    - REALIZATION: ターゲット辺の交点を頂点とする三角を曲線の入射方向に配置
@@ -451,6 +466,8 @@ public ClassDiagramLayout(int horizontalGap, int verticalGap,
 .edgeColor(String hex)                 // デフォルト #000000
 .showDetails()                         // クラスボックス詳細表示
 .picturesque(boolean)                  // 装飾的な描画
+.intention(String dsl)                 // intention DSL 文字列（配置制約・矢印アンカーを設定）
+.intentionFile(Path path)              // intention DSL ファイル（intention() より優先）
 
 LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 ```
@@ -474,7 +491,8 @@ LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 8. **Dependency 生成**: relations から `Dependency` を生成（edgeColor 適用）
 9. **クロスグループ DEPENDENCY 矢印生成**: `ClassInfo.dependencyTargetFqns()` から、別グループのターゲットへの `DEPENDENCY` を追加生成。ただし `srcInfo` が実装するインタフェースがそのターゲットを既に依存している場合は冗長として省略
 10. **サブパッケージグルーピング（オプション）**: 後述
-11. **エッジ端点の分散配置**: 同じ `(box, edge)` を共有する複数エッジの端点を辺上で等間隔に分散（自然交差順を保持）。`spreadDependencyEndpoints()` が `Dependency.setSourceAnchor()/setTargetAnchor()` を呼び出す
+11. **矢印アンカー適用**: `applyArrowConstraints()` が arrow 制約を `Dependency.lockSourceAnchor()/lockTargetAnchor()` で設定。A→B の関係が存在しない場合は `IntentionParseException` をスロー
+12. **エッジ端点の分散配置**: 同じ `(box, edge)` を共有する複数エッジの端点を辺上で等間隔に分散（自然交差順を保持）。ロック済みアンカー（`isSourceAnchorLocked()/isTargetAnchorLocked()` が `true`）は分散対象から除外。`spreadDependencyEndpoints()` が `Dependency.setSourceAnchor()/setTargetAnchor()` を呼び出す
 
 #### サブパッケージグルーピング
 
@@ -523,6 +541,8 @@ public ClassDiagramGenerator(int horizontalGap, int verticalGap,
 .edgeColor(String)
 .showDetails()
 .picturesque(boolean)
+.intention(String dsl)                 // intention DSL 文字列
+.intentionFile(Path path)              // intention DSL ファイル（intention() より優先）
 
 public String generate(Path classRoot, String packageName)
 ```
@@ -641,68 +661,123 @@ var svg = new SVGBuilder(400, 200)
 
 ---
 
-## 今後の予定
+## intention パッケージ
 
-### intention DSL（作図意図の入力）
+`com.sosuisha.classdiagram.intention` パッケージは、自動レイアウトでは表現しきれないユーザの
+作図意図（intention）を独自 DSL で記述するための型群を提供する。PlantUML との互換は意図しない。
 
-自動レイアウトでは表現しきれないユーザの作図意図（intention）を、独自の簡易 DSL で
-明示的に指定できるようにする。スキャナーが検出した関係に対して、レイアウトのヒントや
-描画の上書きを与える追加入力として扱う。PlantUML との互換は意図しない。
+文ごとに 1 行、行頭の動詞（`place` / `arrow`）で文種を識別する。空行・`#` 始まりのコメント行はスキップ。
+識別子は単純名で記述する（FQN 不可）。
 
-文ごとに 1 行、行頭の動詞（`arrow` / `place` など）で文種を識別する。
-識別子は単純名で記述（必要に応じて完全修飾名）。
+### `IntentionParseException`
 
-#### 第一段階: 矢印アンカー指定文 `arrow A B from bottom`
+DSL 構文エラーを表す `RuntimeException`。
 
-`A` から `B` への依存矢印（`Dependency`）について、`A` 側の出発辺を指定する。
-
-- 構文: `arrow <source> <target> from <edge>`
-- 辺トークン（名詞形）: `top` / `bottom` / `left` / `right`
-  - `from top` → ソースの上辺から
-  - `from bottom` → ソースの下辺から
-  - `from left` → ソースの左辺から
-  - `from right` → ソースの右辺から
-- 意味: 該当 `Dependency` の `setSourceAnchor()` を辺中央で呼び出し、`Dependency.draw()` の
-  中心レイ法による交点計算を上書きする。ターゲット側のアンカーは未指定（自動計算）。
-- 将来的に `to <edge>` を追記してターゲット辺も指定可能にする想定:
-  `arrow A B from bottom to top`
-
-例:
-
-```
-arrow Order Item from bottom
-arrow Service Repository from right
+```java
+ex.lineNumber()   // エラーが発生した行番号（1始まり）
+ex.getMessage()   // "line N: <message>" 形式
 ```
 
-##### 想定する適用ポイント
+### `PlaceDirection` 列挙型
 
-- ジェネレーター/レイアウトに intention 入力を渡す API を追加（パス指定または文字列入力）
-- レイアウト計算後の `Dependency` リストに対して、intention をマッチさせてアンカーを上書き
-- `spreadDependencyEndpoints()` との競合は、intention 由来のアンカーを優先（分散対象から除外）
+| 値 | DSL トークン | 意味 |
+|----|------------|------|
+| `ABOVE` | `above` | reference の上側に target を配置 |
+| `BELOW` | `below` | reference の下側に target を配置 |
+| `RIGHT_OF` | `right of` | reference の右側に target を配置 |
+| `LEFT_OF` | `left of` | reference の左側に target を配置 |
 
-#### 第二段階: 配置制約文 `place B below A`
+### `PlaceConstraint` record
 
-`B` を必ず `A` の指定方向に配置するレイアウト制約。関係（`Dependency`）を生成しない、
-純粋な配置ヒントとして扱う。
-
-- 構文: `place <target> <direction> <reference>`
-- 方向トークン（前置詞・前置詞句）: `above` / `below` / `right of` / `left of`
-  - `above A` → A の上側に配置
-  - `below A` → A の下側に配置
-  - `right of A` → A の右側に配置
-  - `left of A` → A の左側に配置
-- 意味: トポロジカルソートおよびバリセンター順序決定の後、`ClassDiagramLayout` の
-  座標確定前に制約を満たすよう `ClassBox` の配置順／レイヤーを調整する。
-- 既存の自動レイアウトと衝突した場合は intention を優先。
-
-例:
-
-```
-place Item below Order
-place Repository right of Service
+```java
+public record PlaceConstraint(
+    String target,           // 配置するクラスの単純名
+    PlaceDirection direction, // 方向
+    String reference,        // 基準クラスの単純名
+    int lineNumber           // エラー報告用行番号
+)
 ```
 
-将来的に絶対座標版 `place B at (100, 50)` への拡張も検討する。
+`target`・`direction`・`reference` は null 禁止。
+
+### `ArrowEdge` 列挙型
+
+| 値 | DSL トークン |
+|----|-------------|
+| `TOP` | `top` |
+| `BOTTOM` | `bottom` |
+| `LEFT` | `left` |
+| `RIGHT` | `right` |
+
+### `ArrowConstraint` record
+
+```java
+public record ArrowConstraint(
+    String source,       // ソースクラスの単純名
+    String target,       // ターゲットクラスの単純名
+    ArrowEdge fromEdge,  // ソース側出口辺
+    ArrowEdge toEdge,    // ターゲット側入口辺（null = 自動計算）
+    int lineNumber       // エラー報告用行番号
+)
+```
+
+`source`・`target`・`fromEdge` は null 禁止。`toEdge` は null 許容。
+
+### `ParseResult` record
+
+```java
+public record ParseResult(
+    List<PlaceConstraint> placeConstraints,   // 変更不可リスト
+    List<ArrowConstraint> arrowConstraints    // 変更不可リスト
+)
+```
+
+両リストは null 禁止かつ `List.copyOf()` でラップされたイミュータブルリスト。
+
+### `IntentionDslParser` クラス
+
+```java
+ParseResult parse(String dsl)
+// @throws NullPointerException dsl が null
+// @throws IntentionParseException 構文エラー（行番号付きメッセージ）
+```
+
+#### place 構文
+
+```
+place <target> above <reference>
+place <target> below <reference>
+place <target> right of <reference>
+place <target> left of <reference>
+```
+
+- `above` / `below`: トークン数 4
+- `right of` / `left of`: トークン数 5（`of` を含む）
+
+#### arrow 構文
+
+```
+arrow <source> <target> from <fromEdge>
+arrow <source> <target> from <fromEdge> to <toEdge>
+```
+
+| トークン数 | 結果 |
+|-----------|------|
+| 5 | `fromEdge` のみ設定、`toEdge = null` |
+| 7 | `fromEdge` と `toEdge` を両方設定 |
+| 6 / 8以上 / <5 | `IntentionParseException` |
+
+不明な辺トークンは `"unknown edge: '<token>'"` でエラー。
+
+#### エラー一覧
+
+| 状況 | メッセージ例 |
+|------|-------------|
+| 未知の動詞 | `line 1: unknown verb: 'connect'` |
+| place 構文不正 | `line 1: invalid place statement` |
+| arrow 構文不正 | `line 1: invalid arrow statement` |
+| 不明な辺トークン | `line 1: unknown edge: 'side'` |
+| A→B 関係が存在しない | `line 1: no relation from 'A' to 'B'` |
 
 #### 語彙の使い分け
 
@@ -711,11 +786,34 @@ place Repository right of Service
 | 配置（B と A の相対位置） | 前置詞句 `above` / `below` / `right of` / `left of` | `place B below A` |
 | 矢印アンカー（A のどの辺から出すか） | 名詞 `top` / `bottom` / `left` / `right` | `arrow A B from bottom` |
 
-配置文で `from below A` と書くと「A の下から来る」と誤読されやすく、矢印文で `from below` も
-同様に紛らわしい。配置は B から見た方向、アンカーは A の辺、と読み方が変わるため、別語彙を採用する。
+---
 
-#### 後続で検討する構文（未確定）
+## intention DSL の使用例
 
-- ターゲット側辺の指定: `arrow A B from bottom to top`
-- 関係種別の明示: `arrow A B kind=composition`（`aggregation` / `realization` / `dependency`）
-- 色やラベルの上書き
+```java
+String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
+    .fontFamily("HackGen")
+    .enableSubPackageGrouping(40)
+    .picturesque(true)
+    .intention("""
+        place TimelineServiceFake right of TimelineServiceImpl
+        arrow TimelineServiceImpl TimelineService from bottom
+        arrow TimelineServiceFake TimelineService from bottom
+        """)
+    .generate(Path.of("target/classes"), "com.example");
+```
+
+- `place` 制約はトポロジカルソート後、座標確定前に `ClassBox` の配置順／レイヤーを調整する
+- `arrow` 制約は `layout()` 内の `applyArrowConstraints()` で適用され、ロック済みアンカーは `spreadDependencyEndpoints()` の分散対象から除外される
+- `intentionFile(Path)` を指定した場合は `intention(String)` より優先される
+- arrow 制約で指定した `source→target` の関係が存在しない場合は `IntentionParseException` をスロー
+- 同名 A→B の関係が複数ある場合（COMPOSITION + AGGREGATION など）はすべてに適用される
+
+---
+
+## 今後の予定
+
+- 絶対座標指定: `place B at (100, 50)`
+- 関係種別の明示: `arrow A B kind=composition`
+- 色・ラベルの上書き
+- クラス継承（`extends`）の検出

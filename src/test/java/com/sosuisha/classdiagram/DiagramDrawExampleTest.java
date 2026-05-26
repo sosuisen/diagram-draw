@@ -181,10 +181,10 @@ class DiagramDrawExampleTest {
                 .interfaceFillColor("#c4ffee")
                 .classFillColor("#ecffc4")
                 .intention("""
-                    place TimelineServiceFake right of TimelineServiceImpl
-                    arrow TimelineServiceImpl TimelineService from bottom
-                    arrow TimelineServiceFake TimelineService from bottom
-                    """)
+                        place TimelineServiceFake right of TimelineServiceImpl
+                        arrow FormViewModel UserService from right to bottom
+                        arrow FormViewModel LoginService from right to bottom
+                        """)
                 .generate(Path.of("samples/classes"), "com.example");
 
         var outputDir = Path.of("target/svg-output");

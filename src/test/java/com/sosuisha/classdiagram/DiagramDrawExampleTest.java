@@ -180,7 +180,11 @@ class DiagramDrawExampleTest {
                 .edgeColor("#661d00")
                 .interfaceFillColor("#c4ffee")
                 .classFillColor("#ecffc4")
-                .intention("place TimelineServiceFake right of TimelineServiceImpl")
+                .intention("""
+                    place TimelineServiceFake right of TimelineServiceImpl
+                    arrow TimelineServiceImpl TimelineService from bottom
+                    arrow TimelineServiceFake TimelineService from bottom
+                    """)
                 .generate(Path.of("samples/classes"), "com.example");
 
         var outputDir = Path.of("target/svg-output");

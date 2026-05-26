@@ -170,6 +170,28 @@ class DiagramDrawExampleTest {
     }
 
     @Test
+    void outputSampleComExamplePicturesqueArrangedSvgFile() throws IOException {
+        var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
+                .fontFamily("HackGen")
+                .enableSubPackageGrouping(40)
+                .picturesque(true)
+                .packageStrokeColor("#79754d")
+                .packageFillColor("#ebdfc7")
+                .edgeColor("#661d00")
+                .interfaceFillColor("#c4ffee")
+                .classFillColor("#ecffc4")
+                .intention("place TimelineServiceFake right of TimelineServiceImpl")
+                .generate(Path.of("samples/classes"), "com.example");
+
+        var outputDir = Path.of("target/svg-output");
+        Files.createDirectories(outputDir);
+        var outputFile = outputDir.resolve("sample-com-example-picturesque-arranged.svg");
+        Files.writeString(outputFile, svg);
+
+        assertTrue(Files.exists(outputFile));
+    }
+
+    @Test
     void outputLongestPathReassignmentExampleSvgFile() throws IOException {
         // Controller→Service→Repository, Controller→Logger
         // Kahn: [[Controller], [Service, Logger], [Repository]]

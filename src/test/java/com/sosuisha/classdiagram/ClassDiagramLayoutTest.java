@@ -490,4 +490,18 @@ class ClassDiagramLayoutTest {
         var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
         assertTrue(boxC.x() > boxB.x());
     }
+
+    @Test
+    void intentionPlaceLeftOfEnforcesOrder() {
+        var a = ci("A"); var b = ci("B"); var c = ci("C");
+        var rels = List.of(rel(a, b), rel(a, c));
+        var layers = new ClassRelationSorter().sort(rels);
+        // "place B left of C": b を c より左に強制
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("place B left of C")
+            .layout(layers, rels);
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
+        assertTrue(boxB.x() < boxC.x(), "B must be to the left of C");
+    }
 }

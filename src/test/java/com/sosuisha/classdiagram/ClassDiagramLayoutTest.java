@@ -518,4 +518,85 @@ class ClassDiagramLayoutTest {
         var boxC = result.boxes().stream().filter(bx -> bx.name().equals("C")).findFirst().orElseThrow();
         assertTrue(boxC.x() < boxB.x());
     }
+
+    @Test
+    void intentionThrowsForUnknownTargetClass() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var ex = assertThrows(
+            com.sosuisha.classdiagram.intention.IntentionParseException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60)
+                .intention("place Unknown below A")
+                .layout(layers, rels));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("Unknown"));
+    }
+
+    @Test
+    void intentionThrowsForUnknownReferenceClass() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var ex = assertThrows(
+            com.sosuisha.classdiagram.intention.IntentionParseException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60)
+                .intention("place A below Ghost")
+                .layout(layers, rels));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("Ghost"));
+    }
+
+    @Test
+    void intentionBelowThrowsForCrossGroup() {
+        var a = ci("A"); var b = ci("B");
+        b.setGroupIndex(1);
+        List<List<ClassInfo>> layers = new ArrayList<>(java.util.List.of(
+            new ArrayList<>(java.util.List.of(a)),
+            new ArrayList<>(java.util.List.of(b))
+        ));
+        var ex = assertThrows(
+            com.sosuisha.classdiagram.intention.IntentionParseException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60)
+                .intention("place A below B")
+                .layout(layers, List.of()));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("connected components"));
+    }
+
+    @Test
+    void intentionRightOfThrowsForDifferentLayers() {
+        var a = ci("A"); var b = ci("B"); var c = ci("C");
+        var rels = List.of(rel(a, b), rel(b, c));
+        var layers = new ClassRelationSorter().sort(rels);
+        var ex = assertThrows(
+            com.sosuisha.classdiagram.intention.IntentionParseException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60)
+                .intention("place C right of B")
+                .layout(layers, rels));
+        assertEquals(1, ex.lineNumber());
+        assertTrue(ex.getMessage().contains("same layer"));
+    }
+
+    @Test
+    void intentionFileThrowsForNullPath() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60).intentionFile(null));
+    }
+
+    @Test
+    void intentionFileLoadsConstraintFromFile(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir)
+            throws Exception {
+        var file = tempDir.resolve("test.intention");
+        java.nio.file.Files.writeString(file, "place A below B");
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intentionFile(file)
+            .layout(layers, rels);
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        assertTrue(boxA.y() > boxB.y(), "A must be below B after constraint loaded from file");
+    }
 }

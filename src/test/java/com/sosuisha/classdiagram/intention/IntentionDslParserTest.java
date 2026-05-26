@@ -3,8 +3,6 @@ package com.sosuisha.classdiagram.intention;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
-import com.sosuisha.classdiagram.intention.ArrowConstraint;
-import com.sosuisha.classdiagram.intention.ArrowEdge;
 
 class IntentionDslParserTest {
 
@@ -196,5 +194,28 @@ class IntentionDslParserTest {
     void arrowConstraintNullFromEdgeThrows() {
         assertThrows(NullPointerException.class,
             () -> new ArrowConstraint("A", "B", null, null, 1));
+    }
+
+    // --- ParseResult ---
+
+    @Test
+    void parseResultNullPlaceListThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ParseResult(null, List.of()));
+    }
+
+    @Test
+    void parseResultNullArrowListThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ParseResult(List.of(), null));
+    }
+
+    @Test
+    void parseResultListsAreImmutable() {
+        var result = new ParseResult(new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        assertThrows(UnsupportedOperationException.class,
+            () -> result.placeConstraints().add(null));
+        assertThrows(UnsupportedOperationException.class,
+            () -> result.arrowConstraints().add(null));
     }
 }

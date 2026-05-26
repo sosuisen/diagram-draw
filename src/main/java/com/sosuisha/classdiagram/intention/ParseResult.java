@@ -17,5 +17,7 @@ public record ParseResult(
     public ParseResult {
         Objects.requireNonNull(placeConstraints, "placeConstraints must not be null");
         Objects.requireNonNull(arrowConstraints, "arrowConstraints must not be null");
+        placeConstraints = List.copyOf(placeConstraints);
+        arrowConstraints = List.copyOf(arrowConstraints);
     }
 }

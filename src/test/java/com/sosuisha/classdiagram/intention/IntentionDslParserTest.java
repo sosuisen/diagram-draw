@@ -52,8 +52,8 @@ class IntentionDslParserTest {
     @Test
     void parsesPlaceBelow() {
         var result = parser.parse("place Item below Order");
-        assertEquals(1, result.size());
-        var c = result.get(0);
+        assertEquals(1, result.placeConstraints().size());
+        var c = result.placeConstraints().get(0);
         assertEquals("Item", c.target());
         assertEquals(PlaceDirection.BELOW, c.direction());
         assertEquals("Order", c.reference());
@@ -63,58 +63,61 @@ class IntentionDslParserTest {
     @Test
     void parsesPlaceAbove() {
         var result = parser.parse("place Item above Order");
-        assertEquals(1, result.size());
-        assertEquals(PlaceDirection.ABOVE, result.get(0).direction());
-        assertEquals("Item", result.get(0).target());
-        assertEquals("Order", result.get(0).reference());
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(PlaceDirection.ABOVE, result.placeConstraints().get(0).direction());
+        assertEquals("Item", result.placeConstraints().get(0).target());
+        assertEquals("Order", result.placeConstraints().get(0).reference());
     }
 
     @Test
     void parsesPlaceRightOf() {
         var result = parser.parse("place Repository right of Service");
-        assertEquals(1, result.size());
-        assertEquals(PlaceDirection.RIGHT_OF, result.get(0).direction());
-        assertEquals("Repository", result.get(0).target());
-        assertEquals("Service", result.get(0).reference());
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(PlaceDirection.RIGHT_OF, result.placeConstraints().get(0).direction());
+        assertEquals("Repository", result.placeConstraints().get(0).target());
+        assertEquals("Service", result.placeConstraints().get(0).reference());
     }
 
     @Test
     void parsesPlaceLeftOf() {
         var result = parser.parse("place A left of B");
-        assertEquals(1, result.size());
-        assertEquals(PlaceDirection.LEFT_OF, result.get(0).direction());
-        assertEquals("A", result.get(0).target());
-        assertEquals("B", result.get(0).reference());
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(PlaceDirection.LEFT_OF, result.placeConstraints().get(0).direction());
+        assertEquals("A", result.placeConstraints().get(0).target());
+        assertEquals("B", result.placeConstraints().get(0).reference());
     }
 
     @Test
     void skipsBlankLines() {
         var result = parser.parse("\n\n  \nplace A below B");
-        assertEquals(1, result.size());
-        assertEquals(4, result.get(0).lineNumber());
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(4, result.placeConstraints().get(0).lineNumber());
     }
 
     @Test
     void skipsCommentLines() {
         var result = parser.parse("# comment\nplace A below B");
-        assertEquals(1, result.size());
-        assertEquals(2, result.get(0).lineNumber());
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(2, result.placeConstraints().get(0).lineNumber());
     }
 
     @Test
     void parsesMultipleStatements() {
         var result = parser.parse("place A below B\nplace C right of D");
-        assertEquals(2, result.size());
-        assertEquals(PlaceDirection.BELOW, result.get(0).direction());
-        assertEquals(PlaceDirection.RIGHT_OF, result.get(1).direction());
-        assertEquals(1, result.get(0).lineNumber());
-        assertEquals(2, result.get(1).lineNumber());
+        assertEquals(2, result.placeConstraints().size());
+        assertEquals(PlaceDirection.BELOW, result.placeConstraints().get(0).direction());
+        assertEquals(PlaceDirection.RIGHT_OF, result.placeConstraints().get(1).direction());
+        assertEquals(1, result.placeConstraints().get(0).lineNumber());
+        assertEquals(2, result.placeConstraints().get(1).lineNumber());
     }
 
     @Test
     void returnsImmutableList() {
         var result = parser.parse("place A below B");
-        assertThrows(UnsupportedOperationException.class, () -> result.add(null));
+        assertThrows(UnsupportedOperationException.class,
+            () -> result.placeConstraints().add(null));
+        assertThrows(UnsupportedOperationException.class,
+            () -> result.arrowConstraints().add(null));
     }
 
     @Test
@@ -125,10 +128,10 @@ class IntentionDslParserTest {
     @Test
     void throwsForUnknownVerb() {
         var ex = assertThrows(IntentionParseException.class,
-            () -> parser.parse("arrow A B from bottom"));
+            () -> parser.parse("connect A B"));
         assertEquals(1, ex.lineNumber());
         assertTrue(ex.getMessage().contains("1"));
-        assertTrue(ex.getMessage().contains("arrow"));
+        assertTrue(ex.getMessage().contains("connect"));
     }
 
     @Test
@@ -156,7 +159,7 @@ class IntentionDslParserTest {
     @Test
     void lineNumberReflectsActualLineInMultilineInput() {
         var ex = assertThrows(IntentionParseException.class,
-            () -> parser.parse("place A below B\narrow X Y from top"));
+            () -> parser.parse("place A below B\nconnect X Y"));
         assertEquals(2, ex.lineNumber());
     }
 

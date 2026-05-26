@@ -2,6 +2,7 @@ package com.sosuisha.classdiagram;
 
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
+import com.sosuisha.classdiagram.intention.ArrowConstraint;
 import com.sosuisha.classdiagram.intention.IntentionDslParser;
 import com.sosuisha.classdiagram.intention.IntentionParseException;
 import com.sosuisha.classdiagram.intention.PlaceConstraint;
@@ -54,6 +55,7 @@ public class ClassDiagramLayout {
     private boolean showDetails = false;
     private boolean picturesque = false;
     private List<PlaceConstraint> placeConstraints = List.of();
+    private List<ArrowConstraint> arrowConstraints = List.of();
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
@@ -200,7 +202,9 @@ public class ClassDiagramLayout {
      */
     public ClassDiagramLayout intention(String dsl) {
         Objects.requireNonNull(dsl, "dsl must not be null");
-        this.placeConstraints = new IntentionDslParser().parse(dsl);
+        var parsed = new IntentionDslParser().parse(dsl);
+        this.placeConstraints = parsed.placeConstraints();
+        this.arrowConstraints = parsed.arrowConstraints();
         return this;
     }
 

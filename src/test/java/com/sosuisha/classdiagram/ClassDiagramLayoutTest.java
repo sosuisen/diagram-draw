@@ -432,4 +432,33 @@ class ClassDiagramLayoutTest {
         assertThrows(NullPointerException.class,
             () -> new ClassDiagramLayout(20, 40, 20, 20, 60).intention(null));
     }
+
+    @Test
+    void intentionPlaceAboveOverridesAutoLayout() {
+        // rel(a, b): auto-layout で a が上、b が下
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // "place B above A": b を a より上に強制
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("place B above A")
+            .layout(layers, rels);
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        assertTrue(boxB.y() < boxA.y(), "B must be above A after constraint");
+    }
+
+    @Test
+    void intentionPlaceAboveNoOpWhenAlreadySatisfied() {
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // "place A above B": a は既に b より上 → 変更なし
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("place A above B")
+            .layout(layers, rels);
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        assertTrue(boxA.y() < boxB.y(), "A must remain above B");
+    }
 }

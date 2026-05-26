@@ -948,8 +948,27 @@ public class ClassDiagramLayout {
 
     private void applyAbove(List<List<ClassInfo>> orderedLayers,
             ClassInfo target, ClassInfo ref, int lineNumber) {
-        // placeholder — implemented in Task 4
-        throw new UnsupportedOperationException("not yet implemented");
+        if (target.groupIndex() != ref.groupIndex()) {
+            throw new IntentionParseException(lineNumber,
+                "'" + target.simpleName() + "' and '" + ref.simpleName()
+                + "' are in different connected components");
+        }
+        int targetIdx = findLayerIndex(orderedLayers, target);
+        int refIdx = findLayerIndex(orderedLayers, ref);
+        if (targetIdx < refIdx) return;
+
+        orderedLayers.get(targetIdx).remove(target);
+        if (orderedLayers.get(targetIdx).isEmpty()) {
+            orderedLayers.remove(targetIdx);
+            if (refIdx > targetIdx) refIdx--;
+        }
+        if (refIdx > 0) {
+            orderedLayers.get(refIdx - 1).add(target);
+        } else {
+            var newLayer = new ArrayList<ClassInfo>();
+            newLayer.add(target);
+            orderedLayers.add(0, newLayer);
+        }
     }
 
     private void applyRightOf(List<List<ClassInfo>> orderedLayers,

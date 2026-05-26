@@ -396,4 +396,40 @@ class ClassDiagramLayoutTest {
         assertEquals(adjacentDist, dist,
             "ImplFoo1 and ImplFoo2 (co-implementors of IFoo) must be adjacent in the same layer");
     }
+
+    @Test
+    void intentionPlaceBelowOverridesAutoLayout() {
+        // rel(a, b): a が所有側 → auto-layout で a が上、b が下
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // "place A below B": a を b より下に強制
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("place A below B")
+            .layout(layers, rels);
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        assertTrue(boxA.y() > boxB.y(), "A must be below B after constraint");
+    }
+
+    @Test
+    void intentionPlaceBelowNoOpWhenAlreadySatisfied() {
+        // rel(a, b): auto-layout で b が既に a より下
+        var a = ci("A"); var b = ci("B");
+        var rels = List.of(rel(a, b));
+        var layers = new ClassRelationSorter().sort(rels);
+        // "place B below A": b は既に a より下 → 変更なし
+        var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .intention("place B below A")
+            .layout(layers, rels);
+        var boxA = result.boxes().stream().filter(bx -> bx.name().equals("A")).findFirst().orElseThrow();
+        var boxB = result.boxes().stream().filter(bx -> bx.name().equals("B")).findFirst().orElseThrow();
+        assertTrue(boxB.y() > boxA.y(), "B must remain below A");
+    }
+
+    @Test
+    void intentionNullThrows() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassDiagramLayout(20, 40, 20, 20, 60).intention(null));
+    }
 }

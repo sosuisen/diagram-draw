@@ -2,6 +2,13 @@ package com.sosuisha.classdiagram;
 
 import com.sosuisha.classdiagram.analyzer.ClassInfo;
 import com.sosuisha.classdiagram.analyzer.ClassRelation;
+import com.sosuisha.classdiagram.intention.IntentionDslParser;
+import com.sosuisha.classdiagram.intention.IntentionParseException;
+import com.sosuisha.classdiagram.intention.PlaceConstraint;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -46,6 +53,7 @@ public class ClassDiagramLayout {
     private String edgeColor = "#000000";
     private boolean showDetails = false;
     private boolean picturesque = false;
+    private List<PlaceConstraint> placeConstraints = List.of();
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
@@ -183,6 +191,38 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * intention DSL文字列をパースして配置制約を設定する。
+     *
+     * @param dsl intention DSL文字列（複数行可）
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException    dslがnullの場合
+     * @throws IntentionParseException DSL構文エラーがある場合
+     */
+    public ClassDiagramLayout intention(String dsl) {
+        Objects.requireNonNull(dsl, "dsl must not be null");
+        this.placeConstraints = new IntentionDslParser().parse(dsl);
+        return this;
+    }
+
+    /**
+     * intention DSLファイルを読み込んで配置制約を設定する。
+     *
+     * @param path intention DSLファイルのパス
+     * @return このレイアウト自身（メソッドチェーン用）
+     * @throws NullPointerException   pathがnullの場合
+     * @throws UncheckedIOException   ファイル読み込みに失敗した場合
+     * @throws IntentionParseException DSL構文エラーがある場合
+     */
+    public ClassDiagramLayout intentionFile(Path path) {
+        Objects.requireNonNull(path, "path must not be null");
+        try {
+            return intention(Files.readString(path));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
      * 16進カラー文字列を階層深度に応じて暗化する。深度 1 は基準色をそのまま返す。
      */
     private static String darkenForDepth(String hex, int depth) {
@@ -203,6 +243,7 @@ public class ClassDiagramLayout {
      * @param relations ClassRelationのリスト
      * @return レイアウト計算結果
      * @throws NullPointerException layersまたはrelationsがnullの場合
+     * @throws com.sosuisha.classdiagram.intention.IntentionParseException intention制約でエラーが発生した場合
      */
     public LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations) {
         Objects.requireNonNull(layers, "layers must not be null");
@@ -230,6 +271,7 @@ public class ClassDiagramLayout {
 
         // 辺交差の最小化（重心法）
         var orderedLayers = minimizeCrossings(layers, relations);
+        applyPlaceConstraints(orderedLayers);
 
         // Step 2: groupIndex ごとにサブレイヤーを構築（空レイヤーは除去）
         var groupIndices = orderedLayers.stream()
@@ -840,6 +882,87 @@ public class ClassDiagramLayout {
     ) {}
 
     private record EdgeKey(ClassBox box, Dependency.BoxEdge edge) {}
+
+    private void applyPlaceConstraints(List<List<ClassInfo>> orderedLayers) {
+        if (placeConstraints.isEmpty()) return;
+
+        var nameToInfo = new LinkedHashMap<String, ClassInfo>();
+        for (var layer : orderedLayers) {
+            for (var info : layer) {
+                nameToInfo.putIfAbsent(info.simpleName(), info);
+            }
+        }
+
+        for (var constraint : placeConstraints) {
+            var targetInfo = nameToInfo.get(constraint.target());
+            var refInfo = nameToInfo.get(constraint.reference());
+            if (targetInfo == null) {
+                throw new IntentionParseException(constraint.lineNumber(),
+                    "unknown class: '" + constraint.target() + "'");
+            }
+            if (refInfo == null) {
+                throw new IntentionParseException(constraint.lineNumber(),
+                    "unknown class: '" + constraint.reference() + "'");
+            }
+            switch (constraint.direction()) {
+                case BELOW -> applyBelow(orderedLayers, targetInfo, refInfo, constraint.lineNumber());
+                case ABOVE -> applyAbove(orderedLayers, targetInfo, refInfo, constraint.lineNumber());
+                case RIGHT_OF -> applyRightOf(orderedLayers, targetInfo, refInfo, constraint.lineNumber());
+                case LEFT_OF -> applyLeftOf(orderedLayers, targetInfo, refInfo, constraint.lineNumber());
+            }
+        }
+    }
+
+    private static int findLayerIndex(List<List<ClassInfo>> layers, ClassInfo info) {
+        for (int i = 0; i < layers.size(); i++) {
+            if (layers.get(i).contains(info)) return i;
+        }
+        return -1;
+    }
+
+    private void applyBelow(List<List<ClassInfo>> orderedLayers,
+            ClassInfo target, ClassInfo ref, int lineNumber) {
+        if (target.groupIndex() != ref.groupIndex()) {
+            throw new IntentionParseException(lineNumber,
+                "'" + target.simpleName() + "' and '" + ref.simpleName()
+                + "' are in different connected components");
+        }
+        int targetIdx = findLayerIndex(orderedLayers, target);
+        int refIdx = findLayerIndex(orderedLayers, ref);
+        if (targetIdx > refIdx) return;
+
+        orderedLayers.get(targetIdx).remove(target);
+        if (orderedLayers.get(targetIdx).isEmpty()) {
+            orderedLayers.remove(targetIdx);
+            if (refIdx > targetIdx) refIdx--;
+        }
+        int insertIdx = refIdx + 1;
+        if (insertIdx < orderedLayers.size()) {
+            orderedLayers.get(insertIdx).add(0, target);
+        } else {
+            var newLayer = new ArrayList<ClassInfo>();
+            newLayer.add(target);
+            orderedLayers.add(newLayer);
+        }
+    }
+
+    private void applyAbove(List<List<ClassInfo>> orderedLayers,
+            ClassInfo target, ClassInfo ref, int lineNumber) {
+        // placeholder — implemented in Task 4
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    private void applyRightOf(List<List<ClassInfo>> orderedLayers,
+            ClassInfo target, ClassInfo ref, int lineNumber) {
+        // placeholder — implemented in Task 5
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    private void applyLeftOf(List<List<ClassInfo>> orderedLayers,
+            ClassInfo target, ClassInfo ref, int lineNumber) {
+        // placeholder — implemented in Task 6
+        throw new UnsupportedOperationException("not yet implemented");
+    }
 
     /**
      * 同じ (box, 辺) を共有する複数エッジの端点を、辺の自然交差順を保ったまま等間隔に分散する。

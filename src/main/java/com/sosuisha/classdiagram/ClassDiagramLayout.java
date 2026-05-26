@@ -193,7 +193,7 @@ public class ClassDiagramLayout {
     }
 
     /**
-     * intention DSL文字列をパースして配置制約を設定する。
+     * intention DSL文字列をパースして配置制約および矢印制約を設定する。
      *
      * @param dsl intention DSL文字列（複数行可）
      * @return このレイアウト自身（メソッドチェーン用）
@@ -209,7 +209,7 @@ public class ClassDiagramLayout {
     }
 
     /**
-     * intention DSLファイルを読み込んで配置制約を設定する。
+     * intention DSLファイルを読み込んで配置制約および矢印制約を設定する。
      *
      * @param path intention DSLファイルのパス
      * @return このレイアウト自身（メソッドチェーン用）

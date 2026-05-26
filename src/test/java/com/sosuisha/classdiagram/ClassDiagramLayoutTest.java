@@ -601,7 +601,7 @@ class ClassDiagramLayoutTest {
     }
 
     @Test
-    void intentionArrowFromBottomLocksSourceAnchor() {
+    void intentionArrowFromBottomOverridesSourceEdge() {
         var a = ci("A"); var b = ci("B");
         var rels = List.of(rel(a, b));
         var layers = new ClassRelationSorter().sort(rels);
@@ -611,12 +611,12 @@ class ClassDiagramLayoutTest {
         var dep = result.dependencies().stream()
             .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
             .findFirst().orElseThrow();
-        assertTrue(dep.isSourceAnchorLocked(), "source anchor must be locked by intention");
-        assertFalse(dep.isTargetAnchorLocked(), "target anchor must not be locked when 'to' is omitted");
+        assertTrue(dep.isSourceEdgeOverridden(), "source edge must be overridden by intention");
+        assertFalse(dep.isTargetEdgeOverridden(), "target edge must not be overridden when 'to' is omitted");
     }
 
     @Test
-    void intentionArrowFromBottomToTopLocksBothAnchors() {
+    void intentionArrowFromBottomToTopOverridesBothEdges() {
         var a = ci("A"); var b = ci("B");
         var rels = List.of(rel(a, b));
         var layers = new ClassRelationSorter().sort(rels);
@@ -626,8 +626,8 @@ class ClassDiagramLayoutTest {
         var dep = result.dependencies().stream()
             .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
             .findFirst().orElseThrow();
-        assertTrue(dep.isSourceAnchorLocked(), "source anchor must be locked");
-        assertTrue(dep.isTargetAnchorLocked(), "target anchor must be locked");
+        assertTrue(dep.isSourceEdgeOverridden(), "source edge must be overridden");
+        assertTrue(dep.isTargetEdgeOverridden(), "target edge must be overridden");
     }
 
     @Test
@@ -647,8 +647,8 @@ class ClassDiagramLayoutTest {
     }
 
     @Test
-    void intentionArrowAppliesToAllMatchingRelations() {
-        // A→B exists as both COMPOSITION and AGGREGATION — both should be locked
+    void intentionArrowOverridesAllMatchingRelations() {
+        // A→B exists as both COMPOSITION and AGGREGATION — both should have source edge overridden
         var a = ci("A"); var b = ci("B");
         var rels = List.of(
             rel(a, b),
@@ -658,10 +658,10 @@ class ClassDiagramLayoutTest {
         var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
             .intention("arrow A B from bottom")
             .layout(layers, rels);
-        var locked = result.dependencies().stream()
+        var overridden = result.dependencies().stream()
             .filter(d -> d.source().name().equals("A") && d.target().name().equals("B"))
-            .filter(Dependency::isSourceAnchorLocked)
+            .filter(Dependency::isSourceEdgeOverridden)
             .count();
-        assertEquals(2, locked, "both A→B relations must have locked source anchor");
+        assertEquals(2, overridden, "both A→B relations must have source edge overridden");
     }
 }

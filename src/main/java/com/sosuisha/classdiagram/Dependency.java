@@ -36,6 +36,8 @@ public final class Dependency implements SvgElement {
     private double[] customTargetDir;
     private boolean sourceAnchorLocked = false;
     private boolean targetAnchorLocked = false;
+    private BoxEdge sourceEdgeOverride = null;
+    private BoxEdge targetEdgeOverride = null;
 
     /**
      * 依存関係を生成する。
@@ -121,6 +123,39 @@ public final class Dependency implements SvgElement {
 
     /** @return ターゲットアンカーが intention によってロックされている場合 {@code true} */
     public boolean isTargetAnchorLocked() { return targetAnchorLocked; }
+
+    /**
+     * intention DSL で指定したソース辺を上書きする。
+     * {@code spreadDependencyEndpoints()} は中心レイ法の代わりにこの辺を使ってグループに追加する。
+     *
+     * @param edge 上書き辺
+     * @throws NullPointerException edgeがnullの場合
+     */
+    public void setSourceEdgeOverride(BoxEdge edge) {
+        this.sourceEdgeOverride = Objects.requireNonNull(edge, "edge must not be null");
+    }
+
+    /**
+     * intention DSL で指定したターゲット辺を上書きする。
+     *
+     * @param edge 上書き辺
+     * @throws NullPointerException edgeがnullの場合
+     */
+    public void setTargetEdgeOverride(BoxEdge edge) {
+        this.targetEdgeOverride = Objects.requireNonNull(edge, "edge must not be null");
+    }
+
+    /** @return ソース辺が intention によって上書き指定されている場合 {@code true} */
+    public boolean isSourceEdgeOverridden() { return sourceEdgeOverride != null; }
+
+    /** @return ターゲット辺が intention によって上書き指定されている場合 {@code true} */
+    public boolean isTargetEdgeOverridden() { return targetEdgeOverride != null; }
+
+    /** @return intention で上書きされたソース辺。未設定時は {@code null} */
+    BoxEdge sourceEdgeOverride() { return sourceEdgeOverride; }
+
+    /** @return intention で上書きされたターゲット辺。未設定時は {@code null} */
+    BoxEdge targetEdgeOverride() { return targetEdgeOverride; }
 
     /**
      * 依存関係のSVG表現を返す。

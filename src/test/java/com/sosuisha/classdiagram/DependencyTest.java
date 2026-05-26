@@ -198,4 +198,30 @@ class DependencyTest {
         dep.lockTargetAnchor(50, 200, 0, 1);
         assertTrue(dep.isTargetAnchorLocked());
     }
+
+    @Test
+    void sourceEdgeNotOverriddenByDefault() {
+        var dep = dep(DependencyType.COMPOSITION);
+        assertFalse(dep.isSourceEdgeOverridden());
+    }
+
+    @Test
+    void targetEdgeNotOverriddenByDefault() {
+        var dep = dep(DependencyType.COMPOSITION);
+        assertFalse(dep.isTargetEdgeOverridden());
+    }
+
+    @Test
+    void setSourceEdgeOverrideSetsFlag() {
+        var dep = dep(DependencyType.COMPOSITION);
+        dep.setSourceEdgeOverride(Dependency.BoxEdge.BOTTOM);
+        assertTrue(dep.isSourceEdgeOverridden());
+    }
+
+    @Test
+    void setTargetEdgeOverrideSetsFlag() {
+        var dep = dep(DependencyType.COMPOSITION);
+        dep.setTargetEdgeOverride(Dependency.BoxEdge.TOP);
+        assertTrue(dep.isTargetEdgeOverridden());
+    }
 }

@@ -903,16 +903,27 @@ public class ClassDiagramLayout {
                     + "' to '" + constraint.target() + "'");
             }
             for (var dep : matched) {
+                dep.setSourceEdgeOverride(arrowEdgeToBoxEdge(constraint.fromEdge()));
                 double[] fromPt  = edgeMidpoint(dep.source(), constraint.fromEdge());
                 double[] fromDir = edgeOutwardDir(constraint.fromEdge());
-                dep.lockSourceAnchor(fromPt[0], fromPt[1], fromDir[0], fromDir[1]);
+                dep.setSourceAnchor(fromPt[0], fromPt[1], fromDir[0], fromDir[1]);
                 if (constraint.toEdge() != null) {
+                    dep.setTargetEdgeOverride(arrowEdgeToBoxEdge(constraint.toEdge()));
                     double[] toPt  = edgeMidpoint(dep.target(), constraint.toEdge());
                     double[] toDir = edgeOutwardDir(constraint.toEdge());
-                    dep.lockTargetAnchor(toPt[0], toPt[1], toDir[0], toDir[1]);
+                    dep.setTargetAnchor(toPt[0], toPt[1], toDir[0], toDir[1]);
                 }
             }
         }
+    }
+
+    private static Dependency.BoxEdge arrowEdgeToBoxEdge(ArrowEdge edge) {
+        return switch (edge) {
+            case TOP    -> Dependency.BoxEdge.TOP;
+            case BOTTOM -> Dependency.BoxEdge.BOTTOM;
+            case LEFT   -> Dependency.BoxEdge.LEFT;
+            case RIGHT  -> Dependency.BoxEdge.RIGHT;
+        };
     }
 
     private static double[] edgeMidpoint(ClassBox box, ArrowEdge edge) {
@@ -1084,10 +1095,20 @@ public class ClassDiagramLayout {
             double ny = dy / len;
             double[] sp = Dependency.edgeIntersection(src, nx, ny);
             double[] tp = Dependency.edgeIntersection(tgt, -nx, -ny);
-            var srcEdge = Dependency.whichEdge(src, sp[0], sp[1]);
-            var tgtEdge = Dependency.whichEdge(tgt, tp[0], tp[1]);
-            double srcNatural = (srcEdge == Dependency.BoxEdge.TOP || srcEdge == Dependency.BoxEdge.BOTTOM) ? sp[0] : sp[1];
-            double tgtNatural = (tgtEdge == Dependency.BoxEdge.TOP || tgtEdge == Dependency.BoxEdge.BOTTOM) ? tp[0] : tp[1];
+            var srcEdge = dep.sourceEdgeOverride() != null
+                ? dep.sourceEdgeOverride()
+                : Dependency.whichEdge(src, sp[0], sp[1]);
+            var tgtEdge = dep.targetEdgeOverride() != null
+                ? dep.targetEdgeOverride()
+                : Dependency.whichEdge(tgt, tp[0], tp[1]);
+            boolean srcHoriz = (srcEdge == Dependency.BoxEdge.TOP || srcEdge == Dependency.BoxEdge.BOTTOM);
+            boolean tgtHoriz = (tgtEdge == Dependency.BoxEdge.TOP || tgtEdge == Dependency.BoxEdge.BOTTOM);
+            double srcNatural = dep.sourceEdgeOverride() != null
+                ? (srcHoriz ? src.x() + src.width() / 2.0 : src.y() + src.height() / 2.0)
+                : (srcHoriz ? sp[0] : sp[1]);
+            double tgtNatural = dep.targetEdgeOverride() != null
+                ? (tgtHoriz ? tgt.x() + tgt.width() / 2.0 : tgt.y() + tgt.height() / 2.0)
+                : (tgtHoriz ? tp[0] : tp[1]);
             if (!dep.isSourceAnchorLocked()) {
                 groups.computeIfAbsent(new EdgeKey(src, srcEdge), k -> new ArrayList<>())
                     .add(new AnchorInfo(dep, true, src, srcEdge, srcNatural));

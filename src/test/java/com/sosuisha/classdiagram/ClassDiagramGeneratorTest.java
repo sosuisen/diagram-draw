@@ -187,4 +187,64 @@ class ClassDiagramGeneratorTest {
         assertFalse(svg.contains("data-diagram-draw=\"package-group\""),
             "SVG should NOT contain package-group when option is disabled");
     }
+
+    @Test
+    void intentionReturnsSelf() {
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.intention("place A below B"));
+    }
+
+    @Test
+    void intentionFileReturnsSelf(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir)
+            throws Exception {
+        var file = tempDir.resolve("test.intention");
+        java.nio.file.Files.writeString(file, "# empty");
+        var gen = new ClassDiagramGenerator(20, 40, 20, 20, 60);
+        assertSame(gen, gen.intentionFile(file));
+    }
+
+    @Test
+    void intentionNullThrowsInGenerator() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassDiagramGenerator(20, 40, 20, 20, 60).intention(null));
+    }
+
+    @Test
+    void intentionFileNullThrowsInGenerator() {
+        assertThrows(NullPointerException.class,
+            () -> new ClassDiagramGenerator(20, 40, 20, 20, 60).intentionFile(null));
+    }
+
+    @Test
+    void intentionIsAppliedDuringGenerate() {
+        var svgNormal = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        var svgConstrained = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("place FixtureOrder below FixtureItem")
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertTrue(svgNormal.startsWith("<svg"));
+        assertTrue(svgConstrained.startsWith("<svg"));
+        assertNotEquals(svgNormal, svgConstrained,
+            "Constrained SVG must differ from normal SVG");
+    }
+
+    @Test
+    void intentionFileOverridesDslWhenBothSet(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        var file = tempDir.resolve("test.intention");
+        java.nio.file.Files.writeString(file, "place FixtureOrder below FixtureItem");
+        var svgDslOnly = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("# no constraint")
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        var svgFileOverride = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("# no constraint")
+            .intentionFile(file)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixture");
+        assertNotEquals(svgDslOnly, svgFileOverride,
+            "intentionFile must override intention() when both are set");
+    }
 }

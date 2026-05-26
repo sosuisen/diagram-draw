@@ -29,6 +29,8 @@ public class ClassDiagramGenerator {
     private String edgeColor = null;
     private boolean showDetails = false;
     private boolean picturesque = false;
+    private String intentionDsl = null;
+    private Path intentionFilePath = null;
 
     /**
      * ClassDiagramGeneratorを生成する。
@@ -171,6 +173,34 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * intention DSL文字列を設定する。{@link #generate} 時にレイアウトへ渡される。
+     * {@link #intentionFile} と両方設定した場合は {@code intentionFile} が優先される。
+     *
+     * @param dsl intention DSL文字列
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException dslがnullの場合
+     */
+    public ClassDiagramGenerator intention(String dsl) {
+        Objects.requireNonNull(dsl, "dsl must not be null");
+        this.intentionDsl = dsl;
+        return this;
+    }
+
+    /**
+     * intention DSLファイルのパスを設定する。{@link #generate} 時にレイアウトへ渡される。
+     * {@link #intention} より優先される。
+     *
+     * @param path intention DSLファイルのパス
+     * @return このジェネレーター自身（メソッドチェーン用）
+     * @throws NullPointerException pathがnullの場合
+     */
+    public ClassDiagramGenerator intentionFile(Path path) {
+        Objects.requireNonNull(path, "path must not be null");
+        this.intentionFilePath = path;
+        return this;
+    }
+
+    /**
      * 指定パッケージのクラス図SVGを生成して返す。
      *
      * @param classRoot   コンパイル済みクラスのルートディレクトリ
@@ -204,6 +234,11 @@ public class ClassDiagramGenerator {
         if (packageStrokeColor != null) layoutEngine.packageStrokeColor(packageStrokeColor);
         if (classBoxStrokeColor != null) layoutEngine.classBoxStrokeColor(classBoxStrokeColor);
         if (edgeColor != null) layoutEngine.edgeColor(edgeColor);
+        if (intentionFilePath != null) {
+            layoutEngine.intentionFile(intentionFilePath);
+        } else if (intentionDsl != null) {
+            layoutEngine.intention(intentionDsl);
+        }
         var result = layoutEngine.layout(layers, relations);
         var builder = new SVGBuilder(result.canvasWidth(), result.canvasHeight());
         if (fontFamily != null) builder.fontFamily(fontFamily);

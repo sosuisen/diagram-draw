@@ -199,11 +199,12 @@ public final class Dependency implements SvgElement {
         double dy = ey - sy;
         double exitProj = Math.abs(dx * exitDir[0] + dy * exitDir[1]);
         double entryProj = Math.abs(dx * entryDir[0] + dy * entryDir[1]);
-        double offset = Math.max(CURVE_OFFSET_MIN, Math.max(exitProj, entryProj) * CURVE_OFFSET_RATIO);
-        double c1x = sx + exitDir[0] * offset;
-        double c1y = sy + exitDir[1] * offset;
-        double c2x = ex + entryDir[0] * offset;
-        double c2y = ey + entryDir[1] * offset;
+        double exitOffset  = Math.max(CURVE_OFFSET_MIN, exitProj  * CURVE_OFFSET_RATIO);
+        double entryOffset = Math.max(CURVE_OFFSET_MIN, entryProj * CURVE_OFFSET_RATIO);
+        double c1x = sx + exitDir[0] * exitOffset;
+        double c1y = sy + exitDir[1] * exitOffset;
+        double c2x = ex + entryDir[0] * entryOffset;
+        double c2y = ey + entryDir[1] * entryOffset;
         return "M %.1f,%.1f C %.1f,%.1f %.1f,%.1f %.1f,%.1f".formatted(
                 sx, sy, c1x, c1y, c2x, c2y, ex, ey);
     }

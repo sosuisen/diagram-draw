@@ -263,8 +263,8 @@ if (dep.isTargetAnchorLocked()) {
 String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
     .intention("""
         place TimelineServiceFake right of TimelineServiceImpl
-        arrow TimelineService TimelineServiceImpl from bottom
-        arrow TimelineService TimelineServiceFake from bottom to top
+        arrow TimelineServiceImpl TimelineService from bottom
+        arrow TimelineServiceFake TimelineService from bottom to top
         """)
     .generate(Path.of("target/classes"), "com.example");
 ```

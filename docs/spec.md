@@ -220,11 +220,15 @@ new Dependency(ClassBox source, ClassBox target, DependencyType type)
 dep.edgeColor("#000000");                        // メソッドチェーン可
 dep.setSourceAnchor(x, y, dirX, dirY);            // 端点と出口方向を手動指定（任意）
 dep.setTargetAnchor(x, y, dirX, dirY);            // 端点と入口方向を手動指定（任意）
-dep.lockSourceAnchor(x, y, dirX, dirY);           // intention 由来アンカーとして設定（spread 対象外）
-dep.lockTargetAnchor(x, y, dirX, dirY);           // intention 由来アンカーとして設定（spread 対象外）
+dep.lockSourceAnchor(x, y, dirX, dirY);           // アンカーを固定設定（spread 対象外）
+dep.lockTargetAnchor(x, y, dirX, dirY);           // アンカーを固定設定（spread 対象外）
+dep.setSourceEdgeOverride(BoxEdge edge);           // intention 由来の辺上書き（spread には参加する）
+dep.setTargetEdgeOverride(BoxEdge edge);           // intention 由来の辺上書き（spread には参加する）
 
-dep.isSourceAnchorLocked();                       // intention によってロックされているか
+dep.isSourceAnchorLocked();                       // ロック済みか
 dep.isTargetAnchorLocked();
+dep.isSourceEdgeOverridden();                     // intention によって辺が上書きされているか
+dep.isTargetEdgeOverridden();
 
 dep.source(); dep.target(); dep.type();
 ```
@@ -232,7 +236,8 @@ dep.source(); dep.target(); dep.type();
 - `source`: 所有側（コンポジション/集約）、実装クラス（実現）、依存元（依存）
 - `target`: 所有される側、インタフェース（実現）、依存先（依存）
 - **アンカー API**: `ClassDiagramLayout` が同一辺を共有する複数エッジを分散配置するために使用する。未設定時は中心レイ法でソース／ターゲットの辺と交差する点を自動計算する
-- **ロックアンカー API**: `lockSourceAnchor()` / `lockTargetAnchor()` で設定したアンカーは `spreadDependencyEndpoints()` の分散対象から除外される。intention DSL の `arrow` 制約が使用する
+- **ロックアンカー API**: `lockSourceAnchor()` / `lockTargetAnchor()` で設定したアンカーは `spreadDependencyEndpoints()` の分散対象から除外される
+- **辺上書き API**: `setSourceEdgeOverride()` / `setTargetEdgeOverride()` で辺を指定すると、`spreadDependencyEndpoints()` の辺グループ割り当てをその辺に固定する（分散配置には参加する）。intention DSL の `arrow` 制約が使用する
 - 内部列挙型 `BoxEdge { TOP, RIGHT, BOTTOM, LEFT }`
 
 #### `draw()` の出力構造
@@ -491,8 +496,8 @@ LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 8. **Dependency 生成**: relations から `Dependency` を生成（edgeColor 適用）
 9. **クロスグループ DEPENDENCY 矢印生成**: `ClassInfo.dependencyTargetFqns()` から、別グループのターゲットへの `DEPENDENCY` を追加生成。ただし `srcInfo` が実装するインタフェースがそのターゲットを既に依存している場合は冗長として省略
 10. **サブパッケージグルーピング（オプション）**: 後述
-11. **矢印アンカー適用**: `applyArrowConstraints()` が arrow 制約を `Dependency.lockSourceAnchor()/lockTargetAnchor()` で設定。A→B の関係が存在しない場合は `IntentionParseException` をスロー
-12. **エッジ端点の分散配置**: 同じ `(box, edge)` を共有する複数エッジの端点を辺上で等間隔に分散（自然交差順を保持）。ロック済みアンカー（`isSourceAnchorLocked()/isTargetAnchorLocked()` が `true`）は分散対象から除外。`spreadDependencyEndpoints()` が `Dependency.setSourceAnchor()/setTargetAnchor()` を呼び出す
+11. **矢印アンカー適用**: `applyArrowConstraints()` が arrow 制約を `Dependency.setSourceEdgeOverride()/setTargetEdgeOverride()` で辺を上書きし、中点を `setSourceAnchor()/setTargetAnchor()` でデフォルトアンカーとして設定する。A→B の関係が存在しない場合は `IntentionParseException` をスロー
+12. **エッジ端点の分散配置**: 同じ `(box, edge)` を共有する複数エッジの端点を辺上で等間隔に分散（自然交差順を保持）。辺上書き済み（`isSourceEdgeOverridden()/isTargetEdgeOverridden()` が `true`）の端点は指定辺のグループに参加して分散される（中点を自然位置として使用）。ロック済みアンカー（`isSourceAnchorLocked()/isTargetAnchorLocked()` が `true`）は分散対象から除外。`spreadDependencyEndpoints()` が `Dependency.setSourceAnchor()/setTargetAnchor()` を呼び出す
 
 #### サブパッケージグルーピング
 
@@ -804,7 +809,7 @@ String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
 ```
 
 - `place` 制約はトポロジカルソート後、座標確定前に `ClassBox` の配置順／レイヤーを調整する
-- `arrow` 制約は `layout()` 内の `applyArrowConstraints()` で適用され、ロック済みアンカーは `spreadDependencyEndpoints()` の分散対象から除外される
+- `arrow` 制約は `layout()` 内の `applyArrowConstraints()` で適用され、辺上書き済みの端点は指定辺のグループに参加して等間隔分散される（中点がデフォルトアンカーとして機能し、複数が同辺に集まると自動で広がる）
 - `intentionFile(Path)` を指定した場合は `intention(String)` より優先される
 - arrow 制約で指定した `source→target` の関係が存在しない場合は `IntentionParseException` をスロー
 - 同名 A→B の関係が複数ある場合（COMPOSITION + AGGREGATION など）はすべてに適用される

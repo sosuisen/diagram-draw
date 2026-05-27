@@ -1,7 +1,6 @@
 package com.sosuisha.classdiagram;
 
 import org.junit.jupiter.api.Test;
-import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -118,7 +117,7 @@ class SVGBuilderTest {
     @Test
     void fontFamilyThrowsForNull() {
         assertThrows(NullPointerException.class,
-            () -> new SVGBuilder(800, 600).fontFamily(null));
+                () -> new SVGBuilder(800, 600).fontFamily(null));
     }
 
     @Test

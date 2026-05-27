@@ -3,7 +3,6 @@ package com.sosuisha.classdiagram;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
-import com.sosuisha.classdiagram.ClassStereotype;
 
 class ClassBoxTest {
 
@@ -86,7 +85,7 @@ class ClassBoxTest {
     @Test
     void setStrokeColorThrowsForNull() {
         assertThrows(NullPointerException.class,
-            () -> new ClassBox("MyClass").setStrokeColor(null));
+                () -> new ClassBox("MyClass").setStrokeColor(null));
     }
 
     @Test
@@ -239,8 +238,8 @@ class ClassBoxTest {
 
     @Test
     void secondFieldHasLineGapBetweenLines() {
-        // nameHeight     = FONT_SIZE + PADDING_Y*2 = 14 + 8 = 22
-        // fields startY  = 22
+        // nameHeight = FONT_SIZE + PADDING_Y*2 = 14 + 8 = 22
+        // fields startY = 22
         // 1行目 baseline = 22 + PADDING_Y + ASCENT = 22 + 4 + 11 = 37
         // 2行目 baseline = 37 + FONT_SIZE + LINE_GAP = 37 + 14 + 4 = 55
         var result = new ClassBox("C", List.of("a", "b"), List.of()).showDetails().draw();
@@ -286,13 +285,15 @@ class ClassBoxTest {
 
     @Test
     void nameOnlyInterfaceBoxWidthAccountsForStereotypeLabel() {
-        // «interface» = 11 chars: 11 * CHAR_WIDTH(8) + PADDING_X*2(16) = 104 > MIN_WIDTH(100)
+        // «interface» = 11 chars: 11 * CHAR_WIDTH(8) + PADDING_X*2(16) = 104 >
+        // MIN_WIDTH(100)
         assertEquals(104, new ClassBox("X", ClassStereotype.INTERFACE).width());
     }
 
     @Test
     void showDetailsInterfaceBoxNameCompartmentIsTwoLinesTaller() {
-        // NONE: compartmentHeight(1) = 22; INTERFACE: compartmentHeight(2) = 40; diff = 18
+        // NONE: compartmentHeight(1) = 22; INTERFACE: compartmentHeight(2) = 40; diff =
+        // 18
         int noneHeight = new ClassBox("MyClass").showDetails().height();
         int ifaceHeight = new ClassBox("MyClass", ClassStereotype.INTERFACE).showDetails().height();
         assertEquals(noneHeight + 18, ifaceHeight);
@@ -300,7 +301,8 @@ class ClassBoxTest {
 
     @Test
     void showDetailsInterfaceBoxWidthAccountsForStereotypeLabel() {
-        // «interface» = 11 chars: 11 * CHAR_WIDTH(8) + PADDING_X*2(16) = 104 > MIN_WIDTH(100)
+        // «interface» = 11 chars: 11 * CHAR_WIDTH(8) + PADDING_X*2(16) = 104 >
+        // MIN_WIDTH(100)
         // "X" alone: 1 * 8 + 16 = 24 → clamped to MIN_WIDTH 100
         assertEquals(104, new ClassBox("X", ClassStereotype.INTERFACE).showDetails().width());
     }

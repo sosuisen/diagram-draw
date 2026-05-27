@@ -121,11 +121,11 @@ class DiagramDrawExampleTest {
     void outputSamplesComExampleClassDiagramSvgFile() throws IOException {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
                 .fontFamily("HackGen")
-                .generate(Path.of("samples/classes"), "com.example");
+                .generate(Path.of("samples/sns-client"), "com.example");
 
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);
-        var outputFile = outputDir.resolve("samples-com-example.svg");
+        var outputFile = outputDir.resolve("samples-sns-client.svg");
         Files.writeString(outputFile, svg);
 
         assertTrue(Files.exists(outputFile));
@@ -136,18 +136,18 @@ class DiagramDrawExampleTest {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
                 .fontFamily("HackGen")
                 .enableSubPackageGrouping(40)
-                .generate(Path.of("samples/classes"), "com.example");
+                .generate(Path.of("samples/sns-client"), "com.example");
 
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);
-        var outputFile = outputDir.resolve("samples-com-example-subpkg.svg");
+        var outputFile = outputDir.resolve("samples-sns-client-subpkg.svg");
         Files.writeString(outputFile, svg);
 
         assertTrue(Files.exists(outputFile));
     }
 
     @Test
-    void outputSampleComExamplePicturesqueSvgFile() throws IOException {
+    void outputSampleSnsClientPicturesqueSvgFile() throws IOException {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
                 .fontFamily("HackGen")
                 .enableSubPackageGrouping(40)
@@ -157,11 +157,11 @@ class DiagramDrawExampleTest {
                 .edgeColor("#661d00")
                 .interfaceFillColor("#c4ffee")
                 .classFillColor("#ecffc4")
-                .generate(Path.of("samples/classes"), "com.example");
+                .generate(Path.of("samples/sns-client"), "com.example");
 
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);
-        var outputFile = outputDir.resolve("sample-com-example-picturesque.svg");
+        var outputFile = outputDir.resolve("sample-sns-client-picturesque.svg");
         Files.writeString(outputFile, svg);
 
         assertTrue(Files.exists(outputFile));
@@ -170,7 +170,7 @@ class DiagramDrawExampleTest {
     }
 
     @Test
-    void outputSampleComExamplePicturesqueArrangedSvgFile() throws IOException {
+    void outputSampleSnsClientPicturesqueArrangedSvgFile() throws IOException {
         var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
                 .fontFamily("HackGen")
                 .enableSubPackageGrouping(40)
@@ -185,11 +185,32 @@ class DiagramDrawExampleTest {
                         arrow FormViewModel UserService from right to bottom
                         arrow FormViewModel LoginService from right to bottom
                         """)
-                .generate(Path.of("samples/classes"), "com.example");
+                .generate(Path.of("samples/sns-client"), "com.example");
 
         var outputDir = Path.of("target/svg-output");
         Files.createDirectories(outputDir);
-        var outputFile = outputDir.resolve("sample-com-example-picturesque-arranged.svg");
+        var outputFile = outputDir.resolve("sample-sns-client-picturesque-arranged.svg");
+        Files.writeString(outputFile, svg);
+
+        assertTrue(Files.exists(outputFile));
+    }
+
+    @Test
+    void outputSampleSnsAdminClientPicturesqueArrangedSvgFile() throws IOException {
+        var svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
+                .fontFamily("HackGen")
+                .enableSubPackageGrouping(40)
+                .picturesque(true)
+                .packageStrokeColor("#79754d")
+                .packageFillColor("#ebdfc7")
+                .edgeColor("#661d00")
+                .interfaceFillColor("#c4ffee")
+                .classFillColor("#ecffc4")
+                .generate(Path.of("samples/sns-admin-client"), "com.example");
+
+        var outputDir = Path.of("target/svg-output");
+        Files.createDirectories(outputDir);
+        var outputFile = outputDir.resolve("sample-sns-admin-client-picturesque-arranged.svg");
         Files.writeString(outputFile, svg);
 
         assertTrue(Files.exists(outputFile));

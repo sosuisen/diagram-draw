@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
  * {@link ClassRelation} のリストをトポロジカルソートし、
  * 描画レイヤーごとに分類された {@link ClassInfo} のリストを返す。
  *
- * <p>アルゴリズム: Kahn's BFS（幅優先探索によるトポロジカルソート）。
+ * <p>
+ * アルゴリズム: Kahn's BFS（幅優先探索によるトポロジカルソート）。
  * 各クラスを入次数（自分を所有するクラスの数）で管理し、
  * 入次数が0のクラスから順にレイヤーへ割り当てる。
  * 全クラスを処理できなかった場合は循環参照と判定して例外をスローする。
@@ -43,13 +44,14 @@ public class ClassRelationSorter {
         Map<ClassInfo, Integer> inDegree = new HashMap<>();
 
         // Deduplicate: same (source, target) pair may appear more than once in input
-        // For REALIZATION edges, reverse direction so the interface (target) gets low in-degree
+        // For REALIZATION edges, reverse direction so the interface (target) gets low
+        // in-degree
         // and is placed in the top layer above the implementing class.
         var uniqueEdges = relations.stream()
-            .map(r -> r.type() == DependencyType.REALIZATION
-                ? Map.entry(r.targetClassInfo(), r.sourceClassInfo())
-                : Map.entry(r.sourceClassInfo(), r.targetClassInfo()))
-            .collect(Collectors.toSet());
+                .map(r -> r.type() == DependencyType.REALIZATION
+                        ? Map.entry(r.targetClassInfo(), r.sourceClassInfo())
+                        : Map.entry(r.sourceClassInfo(), r.targetClassInfo()))
+                .collect(Collectors.toSet());
 
         for (var edge : uniqueEdges) {
             var src = edge.getKey();
@@ -62,10 +64,10 @@ public class ClassRelationSorter {
 
         // 入次数が0のノードを最初のレイヤーとして投入する
         var currentLayer = inDegree.entrySet().stream()
-            .filter(e -> e.getValue() == 0)
-            .map(Map.Entry::getKey)
-            .sorted(Comparator.comparing(ClassInfo::simpleName).thenComparing(ClassInfo::packageName))
-            .collect(Collectors.toCollection(ArrayList::new));
+                .filter(e -> e.getValue() == 0)
+                .map(Map.Entry::getKey)
+                .sorted(Comparator.comparing(ClassInfo::simpleName).thenComparing(ClassInfo::packageName))
+                .collect(Collectors.toCollection(ArrayList::new));
 
         var result = new ArrayList<List<ClassInfo>>();
         int emitted = 0;
@@ -91,12 +93,12 @@ public class ClassRelationSorter {
         // 入次数が残っているノードは循環参照に含まれる
         if (emitted < inDegree.size()) {
             var cycleNames = inDegree.entrySet().stream()
-                .filter(e -> e.getValue() > 0)
-                .map(e -> e.getKey().simpleName())
-                .sorted()
-                .collect(Collectors.joining(", "));
+                    .filter(e -> e.getValue() > 0)
+                    .map(e -> e.getKey().simpleName())
+                    .sorted()
+                    .collect(Collectors.joining(", "));
             throw new CircularRelationException(
-                "Circular relation detected among: [" + cycleNames + "]");
+                    "Circular relation detected among: [" + cycleNames + "]");
         }
 
         return List.copyOf(result);

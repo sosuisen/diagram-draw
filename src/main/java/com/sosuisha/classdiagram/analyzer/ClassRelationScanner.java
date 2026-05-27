@@ -75,7 +75,7 @@ public class ClassRelationScanner {
 
             var fieldFqns = new HashSet<String>();
             for (var field : model.fields()) {
-                if (field.flags().has(AccessFlag.STATIC)) continue;
+                if (field.flags().has(AccessFlag.ENUM)) continue;
                 var resolved = resolveFieldTarget(field, targetClassNames);
                 if (resolved == null) continue;
                 fieldFqns.add(resolved.targetClassName());

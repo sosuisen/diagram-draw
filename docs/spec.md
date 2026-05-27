@@ -375,7 +375,7 @@ List<ClassRelation> scan(Path classRoot, String packageName)
 | **REALIZATION** | `implements` でターゲットパッケージ内のインタフェースを実装している |
 | **DEPENDENCY** | メソッドのパラメータ型／ジェネリックパラメータ／ローカル変数型がターゲットパッケージ内のクラス（自分自身およびフィールド型を除く） |
 
-- `static` フィールドは対象外（enum 定数・Singleton パターン等の自己参照を除外するため）
+- `ACC_ENUM` フラグを持つフィールド（enum 定数）は対象外（自己参照による誤検出を防ぐため）
 - コレクション型（`List<T>` 等）のフィールドはジェネリック引数を見て `isMany = true`
 - 両クラスが同一スキャンパッケージ内に存在する場合のみ関係を生成
 
@@ -663,7 +663,7 @@ var svg = new SVGBuilder(400, 200)
 - 配列フィールドは `isMany` 判定の対象外（コレクション型のみ）
 - 異なるスキャンパッケージ間の関係は生成しない（同一 `packageName` 配下のみ）
 - クラス継承（`extends`）は未対応
-- `static` フィールドは COMPOSITION/AGGREGATION の検出対象外（enum 定数のような自己参照フィールドによる誤検出を防ぐため）
+- enum 定数（`ACC_ENUM` フラグを持つフィールド）は COMPOSITION/AGGREGATION の検出対象外（自己参照フィールドによる誤検出を防ぐため）。通常の `static` フィールドは対象
 
 ---
 

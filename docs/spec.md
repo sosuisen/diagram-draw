@@ -823,3 +823,4 @@ String svg = new ClassDiagramGenerator(30, 50, 30, 30, 60)
 - 関係種別の明示: `arrow A B kind=composition`
 - 色・ラベルの上書き
 - クラス継承（`extends`）の検出
+- インナークラスを解析。たとえば、samplesのsns-clientのSceneManagerのなかのStateクラス。Viewを保持しているのでクラス図に反映させたい。

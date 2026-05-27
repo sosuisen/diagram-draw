@@ -939,7 +939,7 @@ Expected: 全テスト PASS
 
 - [ ] **Step 2: DiagramDrawExampleTest に arrow を含む出力テストを追加**
 
-`DiagramDrawExampleTest.java` の `outputSampleComExamplePicturesqueArrangedSvgFile` メソッドを更新して arrow 制約を追加。
+`DiagramDrawExampleTest.java` の `outputSampleSnsClientPicturesqueArrangedSvgFile` メソッドを更新して arrow 制約を追加。
 
 現在の `intention("place TimelineServiceFake right of TimelineServiceImpl")` の行を:
 
@@ -960,10 +960,10 @@ Expected: 全テスト PASS
 - [ ] **Step 3: SVG を生成して確認**
 
 ```
-mvn test "-Dtest=DiagramDrawExampleTest#outputSampleComExamplePicturesqueArrangedSvgFile"
+mvn test "-Dtest=DiagramDrawExampleTest#outputSampleSnsClientPicturesqueArrangedSvgFile"
 ```
 
-Expected: PASS、`target/svg-output/sample-com-example-picturesque-arranged.svg` が更新される
+Expected: PASS、`target/svg-output/sample-sns-client-picturesque-arranged.svg` が更新される
 
 - [ ] **Step 4: Commit**
 

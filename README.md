@@ -20,7 +20,7 @@ Run this command in your project.
 Replace `com.example` with your own package.
 
 ```
-mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.0:generate -Dclassdiagram.package=com.example
+mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.1:generate -Dclassdiagram.package=com.example
 ```
 
 The diagram is written to `target/classdiagram.svg`.
@@ -36,7 +36,7 @@ Add the plugin to your `pom.xml` if you use it often.
     <plugin>
       <groupId>com.sosuisha</groupId>
       <artifactId>classdiagram-maven-plugin</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
       <configuration>
         <packageName>com.example</packageName>
         <picturesque>true</picturesque>
@@ -113,7 +113,7 @@ Colors are written like `#ecffc4`.
 You can also see all parameters with this command.
 
 ```
-mvn com.sosuisha:classdiagram-maven-plugin:1.0.0:help -Ddetail
+mvn com.sosuisha:classdiagram-maven-plugin:1.0.1:help -Ddetail
 ```
 
 ## Adjust the Layout
@@ -133,7 +133,7 @@ arrow FormViewModel UserService from right to bottom
 Pass the file with the `intentionFile` parameter.
 
 ```
-mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.0:generate -Dclassdiagram.package=com.example -Dclassdiagram.intentionFile=diagram.intention
+mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.1:generate -Dclassdiagram.package=com.example -Dclassdiagram.intentionFile=diagram.intention
 ```
 
 The file has two kinds of statements.

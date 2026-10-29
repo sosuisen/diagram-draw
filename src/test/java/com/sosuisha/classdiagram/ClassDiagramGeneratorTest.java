@@ -382,4 +382,33 @@ class ClassDiagramGeneratorTest {
         assertTrue(coreX > uiRight, "core must be right of ui");
         assertTrue(coreX > infraRight, "core must be right of infra");
     }
+
+    @Test
+    void seedChangesWobbleOfBoxesAndPackageFrames() {
+        var a = new ClassDiagramGenerator(20, 40, 20, 20, 60).enableSubPackageGrouping(20).seed(1)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixmerge");
+        var b = new ClassDiagramGenerator(20, 40, 20, 20, 60).enableSubPackageGrouping(20).seed(2)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixmerge");
+        assertNotEquals(boxPart(a, "FixtureMergeUser"), boxPart(b, "FixtureMergeUser"));
+        assertNotEquals(packagePart(a, "model"), packagePart(b, "model"));
+    }
+
+    @Test
+    void seedZeroIsTheDefault() {
+        var plain = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        var seeded = new ClassDiagramGenerator(20, 40, 20, 20, 60).seed(0)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        assertEquals(plain, seeded);
+    }
+
+    private static String boxPart(String svg, String name) {
+        var start = svg.indexOf("data-diagram-draw=\"box\" data-diagram-draw-type=\"class\" data-diagram-draw-name=\"" + name + "\"");
+        return svg.substring(start, svg.indexOf("</g>", start));
+    }
+
+    private static String packagePart(String svg, String label) {
+        var start = svg.indexOf("data-diagram-draw=\"package-group\" data-diagram-draw-name=\"" + label + "\"");
+        return svg.substring(start, svg.indexOf("</g>", start));
+    }
 }

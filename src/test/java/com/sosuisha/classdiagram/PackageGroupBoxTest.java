@@ -123,4 +123,19 @@ class PackageGroupBoxTest {
         assertTrue(svg.contains("M 98,50 L 100,48"));
         assertTrue(svg.contains("stroke-dasharray=\"2,2\""));
     }
+
+    @Test
+    void seedZeroDrawsSameAsDefault() {
+        var plain = new PackageGroupBox("model", 0, 0, 200, 100, null, false, "#000000");
+        var seeded = new PackageGroupBox("model", 0, 0, 200, 100, null, false, "#000000", 0);
+        assertEquals(plain.draw(), seeded.draw());
+    }
+
+    @Test
+    void differentSeedChangesWobble() {
+        var a = new PackageGroupBox("model", 0, 0, 200, 100, null, false, "#000000", 1);
+        var b = new PackageGroupBox("model", 0, 0, 200, 100, null, false, "#000000", 2);
+        assertNotEquals(a.draw(), b.draw());
+        assertEquals(1, a.seed());
+    }
 }

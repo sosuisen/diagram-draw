@@ -165,6 +165,9 @@ box.fillColor(); box.strokeColor();   // 色
   - 両方存在: `2.0`
 - `picturesque(true)` 時は輪郭線を 1px シフトした2本目のスケッチ線で重ね描き（手描きの重ね書きを模倣）
 
+- 乱数のシードは内容のハッシュ値（名前のみ表示なら `name`、詳細表示なら `name, stereotype, fields, methods`）に、図全体のシード `seed(long)` を混ぜて作る。混ぜ方は `SketchSeed.mix(hash, seed) = hash + seed * 0x9E3779B97F4A7C15L`。`seed = 0` のときは内容のハッシュ値と一致する
+- `PackageGroupBox` も同じ方法で、`label, width, height` のハッシュ値に `seed` を混ぜる
+- Maven プラグインでは、`seed` は常に `(groupId + ":" + artifactId).hashCode()`。`String.hashCode()` は Java の仕様で計算方法が決まっているため、JDK や OS が違っても同じ揺れ方になる。利用者は変更できない
 ---
 
 ### `PackageGroupBox` クラス
@@ -565,6 +568,7 @@ public String generate(Path classRoot, String packageName)
 
 #### 内部パイプライン
 
+.seed(long)                            // 揺らぎのシード（既定 0）
 ```
 ClassRelationScanner.scanAll()
         ↓ ScanResult (classes, relations)

@@ -339,4 +339,26 @@ class ClassBoxTest {
     void drawWithoutArrowsOmittedHasNoNote() {
         assertFalse(new ClassBox("App").draw().contains("arrows omitted"));
     }
+
+    @Test
+    void seedZeroDrawsSameAsDefault() {
+        assertEquals(new ClassBox("Order").draw(), new ClassBox("Order").seed(0).draw());
+    }
+
+    @Test
+    void differentSeedChangesWobble() {
+        assertNotEquals(new ClassBox("Order").seed(1).draw(), new ClassBox("Order").seed(2).draw());
+    }
+
+    @Test
+    void sameSeedDrawsSameWobble() {
+        assertEquals(new ClassBox("Order").seed(7).draw(), new ClassBox("Order").seed(7).draw());
+    }
+
+    @Test
+    void seedAlsoChangesPicturesqueSecondLine() {
+        var a = new ClassBox("Order").picturesque(true).seed(1).draw();
+        var b = new ClassBox("Order").picturesque(true).seed(2).draw();
+        assertNotEquals(a, b);
+    }
 }

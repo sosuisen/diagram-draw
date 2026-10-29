@@ -18,6 +18,7 @@ public final class PackageGroupBox implements SvgElement {
     private final String fillColor;
     private final boolean picturesque;
     private final String strokeColor;
+    private final long seed;
 
     /**
      * PackageGroupBoxを生成する（塗りつぶしなし）。
@@ -84,6 +85,26 @@ public final class PackageGroupBox implements SvgElement {
      */
     public PackageGroupBox(String label, int x, int y, int width, int height,
                            String fillColor, boolean picturesque, String strokeColor) {
+        this(label, x, y, width, height, fillColor, picturesque, strokeColor, 0);
+    }
+
+    /**
+     * 揺らぎのシードも指定してPackageGroupBoxを生成する。
+     *
+     * @param label       サブパッケージラベル
+     * @param x           左上X座標
+     * @param y           左上Y座標
+     * @param width       幅（px、正数）
+     * @param height      高さ（px、正数）
+     * @param fillColor   塗りつぶし色（{@code null} で塗りなし）
+     * @param picturesque 装飾的な影表現を描画する場合は {@code true}
+     * @param strokeColor 枠線色
+     * @param seed        輪郭の揺らぎに使う図全体のシード（0は既定の揺れ方）
+     * @throws NullPointerException     labelまたはstrokeColorがnullの場合
+     * @throws IllegalArgumentException widthまたはheightが0以下の場合
+     */
+    public PackageGroupBox(String label, int x, int y, int width, int height,
+                           String fillColor, boolean picturesque, String strokeColor, long seed) {
         Objects.requireNonNull(label, "label must not be null");
         Objects.requireNonNull(strokeColor, "strokeColor must not be null");
         if (width <= 0) {
@@ -100,6 +121,7 @@ public final class PackageGroupBox implements SvgElement {
         this.fillColor = fillColor;
         this.picturesque = picturesque;
         this.strokeColor = strokeColor;
+        this.seed = seed;
     }
 
     /** @return サブパッケージラベル */
@@ -126,6 +148,9 @@ public final class PackageGroupBox implements SvgElement {
     /** @return 枠線色 */
     public String strokeColor() { return strokeColor; }
 
+    /** @return 輪郭の揺らぎに使う図全体のシード */
+    public long seed() { return seed; }
+
     private static final int FONT_SIZE = 12;
     private static final int CHAR_WIDTH = FONT_SIZE / 2 + 1;
     private static final int LABEL_PADDING_X = 6;
@@ -145,7 +170,7 @@ public final class PackageGroupBox implements SvgElement {
      */
     @Override
     public String draw() {
-        var rng = new Random(Objects.hash(label, width, height));
+        var rng = new Random(SketchSeed.mix(Objects.hash(label, width, height), seed));
         int tabWidth = Math.min(label.length() * CHAR_WIDTH + LABEL_PADDING_X * 2, width);
         var sb = new StringBuilder();
         sb.append("<g data-diagram-draw=\"package-group\" data-diagram-draw-name=\"%s\" transform=\"translate(%d,%d)\">"

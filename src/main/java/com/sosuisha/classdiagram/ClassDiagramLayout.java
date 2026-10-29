@@ -57,6 +57,7 @@ public class ClassDiagramLayout {
     private String edgeColor = "#000000";
     private boolean showDetails = false;
     private boolean picturesque = false;
+    private long seed = 0;
     private List<PlaceConstraint> placeConstraints = List.of();
     private List<ArrowConstraint> arrowConstraints = List.of();
     private List<OmitArrowsConstraint> omitArrowsConstraints = List.of();
@@ -197,6 +198,18 @@ public class ClassDiagramLayout {
     }
 
     /**
+     * 輪郭の揺らぎに使う乱数のシードを設定する。
+     * シードを変えると、すべてのクラスボックスとパッケージ矩形の揺れ方が変わる。0は既定の揺れ方になる。
+     *
+     * @param seed 図全体のシード
+     * @return このレイアウト自身（メソッドチェーン用）
+     */
+    public ClassDiagramLayout seed(long seed) {
+        this.seed = seed;
+        return this;
+    }
+
+    /**
      * intention DSL文字列をパースして配置制約・矢印制約・線の省略を設定する。
      *
      * @param dsl intention DSL文字列（複数行可）
@@ -272,6 +285,7 @@ public class ClassDiagramLayout {
                     box.showDetails();
                 }
                 box.picturesque(picturesque);
+                box.seed(seed);
                 box.setStrokeColor(classBoxStrokeColor);
                 box.setFillColor(info.stereotype() == ClassStereotype.INTERFACE
                     ? interfaceFillColor : classFillColor);
@@ -716,7 +730,7 @@ public class ClassDiagramLayout {
         if (hasRect) {
             packageGroups.add(new PackageGroupBox(
                 node.localLabel, x, y, totalWidth, totalHeight,
-                darkenForDepth(packageFillColor, depth), picturesque, packageStrokeColor));
+                darkenForDepth(packageFillColor, depth), picturesque, packageStrokeColor, seed));
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
@@ -833,7 +847,8 @@ public class ClassDiagramLayout {
             var old = packageGroups.get(i);
             packageGroups.set(i, new PackageGroupBox(
                 old.label(), old.x() + dx, old.y() + dy,
-                old.width(), old.height(), old.fillColor(), old.picturesque(), old.strokeColor()));
+                old.width(), old.height(), old.fillColor(), old.picturesque(), old.strokeColor(),
+                old.seed()));
         }
     }
 

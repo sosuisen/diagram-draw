@@ -89,6 +89,11 @@ Classes without any relation are also drawn.
 Set a parameter in `<configuration>`, or on the command line with `-D`.
 
 | Parameter | Command line | Default | Description |
+The lines of boxes and frames wobble a little to look hand-drawn.
+The wobble comes from the `groupId` and `artifactId` of your project.
+Each project gets its own wobble, and the same project always gets the same wobble.
+So the SVG does not change between builds unless your classes change.
+
 |---|---|---|---|
 | `packageName` | `classdiagram.package` | (required) | Package to draw. Subpackages are included. |
 | `classesDirectory` | `classdiagram.classesDirectory` | `${project.build.outputDirectory}` | Root directory of the compiled classes. |

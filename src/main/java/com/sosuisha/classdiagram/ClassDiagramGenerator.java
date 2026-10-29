@@ -34,6 +34,7 @@ public class ClassDiagramGenerator {
     private String edgeColor = null;
     private boolean showDetails = false;
     private boolean picturesque = false;
+    private long seed = 0;
     private String intentionDsl = null;
     private Path intentionFilePath = null;
 
@@ -178,6 +179,18 @@ public class ClassDiagramGenerator {
     }
 
     /**
+     * 輪郭の揺らぎに使う乱数のシードを設定する。
+     * シードを変えると、すべてのクラスボックスとパッケージ矩形の揺れ方が変わる。0は既定の揺れ方になる。
+     *
+     * @param seed 図全体のシード
+     * @return このジェネレーター自身（メソッドチェーン用）
+     */
+    public ClassDiagramGenerator seed(long seed) {
+        this.seed = seed;
+        return this;
+    }
+
+    /**
      * intention DSL文字列を設定する。{@link #generate} 時にレイアウトへ渡される。
      * {@link #intentionFile} と両方設定した場合は {@code intentionFile} が優先される。
      *
@@ -235,6 +248,7 @@ public class ClassDiagramGenerator {
         }
         if (showDetails) layoutEngine.showDetails();
         layoutEngine.picturesque(picturesque);
+        layoutEngine.seed(seed);
         if (classFillColor != null) layoutEngine.classFillColor(classFillColor);
         if (interfaceFillColor != null) layoutEngine.interfaceFillColor(interfaceFillColor);
         if (packageFillColor != null) layoutEngine.packageFillColor(packageFillColor);

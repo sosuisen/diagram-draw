@@ -149,6 +149,13 @@ public class GenerateMojo extends AbstractMojo {
     @Parameter(property = "classdiagram.picturesque", defaultValue = "false")
     boolean picturesque;
 
+    // Read-only: the wobble is always derived from the project coordinates.
+    @Parameter(defaultValue = "${project.groupId}", readonly = true, required = true)
+    String groupId;
+
+    @Parameter(defaultValue = "${project.artifactId}", readonly = true, required = true)
+    String artifactId;
+
     /**
      * Skips this goal.
      */
@@ -195,7 +202,10 @@ public class GenerateMojo extends AbstractMojo {
     private ClassDiagramGenerator createGenerator() {
         var generator = new ClassDiagramGenerator(
                 horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY, groupGap)
-                .picturesque(picturesque);
+                .picturesque(picturesque)
+                // String.hashCode() is defined by the Java spec, so every JDK and OS
+                // gives the same wobble for the same project.
+                .seed((groupId + ":" + artifactId).hashCode());
         if (packageGap >= 0) {
             generator.enableSubPackageGrouping(packageGap);
         }

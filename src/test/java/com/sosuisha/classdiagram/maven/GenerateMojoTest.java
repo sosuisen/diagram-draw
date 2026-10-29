@@ -18,6 +18,8 @@ class GenerateMojoTest {
         mojo.classesDirectory = new File("samples/sns-client");
         mojo.packageName = packageName;
         mojo.outputFile = tempDir.resolve("out/diagram.svg").toFile();
+        mojo.groupId = "com.example";
+        mojo.artifactId = "sample";
         return mojo;
     }
 
@@ -73,5 +75,28 @@ class GenerateMojoTest {
         mojo.execute();
 
         assertFalse(Files.exists(mojo.outputFile.toPath()));
+    }
+
+    @Test
+    void sameProjectCoordinatesDrawSameDiagram() throws Exception {
+        var a = createMojo("com.example");
+        a.groupId = "com.acme";
+        a.artifactId = "shop";
+        a.execute();
+        var first = Files.readString(a.outputFile.toPath());
+        a.execute();
+        assertEquals(first, Files.readString(a.outputFile.toPath()));
+    }
+
+    @Test
+    void differentArtifactIdChangesWobble() throws Exception {
+        var a = createMojo("com.example");
+        a.groupId = "com.acme";
+        a.artifactId = "shop";
+        a.execute();
+        var shop = Files.readString(a.outputFile.toPath());
+        a.artifactId = "admin";
+        a.execute();
+        assertNotEquals(shop, Files.readString(a.outputFile.toPath()));
     }
 }

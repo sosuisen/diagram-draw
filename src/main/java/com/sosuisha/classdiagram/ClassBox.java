@@ -42,6 +42,7 @@ public final class ClassBox implements SvgElement {
     private boolean showDetails = false;
     private boolean picturesque = false;
     private boolean arrowsOmitted = false;
+    private long seed = 0;
 
     /**
      * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
@@ -187,6 +188,21 @@ public final class ClassBox implements SvgElement {
     public boolean arrowsOmitted() { return arrowsOmitted; }
 
     /**
+     * 輪郭の揺らぎに使う乱数のシードを設定する。
+     * 同じクラスでもシードが違えば揺れ方が変わる。0は既定の揺れ方になる。
+     *
+     * @param seed 図全体のシード
+     * @return このClassBox自身（メソッドチェーン用）
+     */
+    public ClassBox seed(long seed) {
+        this.seed = seed;
+        return this;
+    }
+
+    /** @return 輪郭の揺らぎに使う乱数のシード */
+    public long seed() { return seed; }
+
+    /**
      * コンテンツから自動計算した幅を返す。
      *
      * @return 幅（px）
@@ -278,13 +294,13 @@ public final class ClassBox implements SvgElement {
 
     private Random createRandom() {
         if (!showDetails) {
-            return new Random(Objects.hash(name));
+            return new Random(SketchSeed.mix(Objects.hash(name), seed));
         }
-        return new Random(Objects.hash(name, stereotype, fields, methods));
+        return new Random(SketchSeed.mix(Objects.hash(name, stereotype, fields, methods), seed));
     }
 
     private Random createRandomForBold() {
-        return new Random(Objects.hash(name + "_bold"));
+        return new Random(SketchSeed.mix(Objects.hash(name + "_bold"), seed));
     }
 
     private static String sketchBoldLine(int x1, int y1, int x2, int y2,

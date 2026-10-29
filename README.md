@@ -125,13 +125,18 @@ The plugin places classes automatically.
 You can adjust the result with an intention file.
 
 ```
+# Hide the lines of App, which uses almost every class.
+omit arrows of App
+
 # Put TimelineServiceFake to the right of TimelineServiceImpl.
 place TimelineServiceFake right of TimelineServiceImpl
 
 # Start the arrow from the right side of FormViewModel.
-# End it at the bottom side of UserService.
-arrow FormViewModel UserService from right to bottom
+# End it at the left side of UserService.
+arrow FormViewModel UserService from right to left
 ```
+
+The example image at the top of this page uses this file.
 
 Pass the file with the `intentionFile` parameter.
 

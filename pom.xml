@@ -7,9 +7,38 @@
   <artifactId>classdiagram-maven-plugin</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
+
+  <name>Class Diagram Maven Plugin</name>
+  <description>A Maven plugin that draws a hand-drawn style UML class diagram in SVG from compiled classes</description>
+  <url>https://github.com/sosuisen/diagram-draw</url>
+
   <properties>
     <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>sosuisen</id>
+      <name>Hidekazu Kubota</name>
+      <email>hidekazu.kubota@gmail.com</email>
+      <organization>Sosuisha</organization>
+      <organizationUrl>https://sosuisha.com</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:git://github.com/sosuisen/diagram-draw.git</connection>
+    <developerConnection>scm:git:ssh://github.com/sosuisen/diagram-draw.git</developerConnection>
+    <url>https://github.com/sosuisen/diagram-draw/tree/main</url>
+  </scm>
 
   <dependencies>
     <dependency>
@@ -58,5 +87,80 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Central requires sources, Javadoc and signatures. Keep them out of the
+         default build so local `mvn install` works without a GPG key. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.12.0</version>
+            <configuration>
+              <!-- Strict doclint would fail the release on minor Javadoc style issues. -->
+              <doclint>none</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <!-- Without loopback mode gpg waits for a passphrase prompt
+                       when there is no TTY, and the build hangs. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.12.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <!-- Check the deployment in the Central Portal before it goes public. -->
+              <autoPublish>false</autoPublish>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

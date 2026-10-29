@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import com.sosuisha.classdiagram.ClassStereotype;
 import com.sosuisha.classdiagram.DependencyType;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,23 +41,36 @@ public class ClassRelationScanner {
      * @throws NullPointerException classRootまたはpackageNameがnullの場合
      */
     public List<ClassRelation> scan(Path classRoot, String packageName) {
+        return scanAll(classRoot, packageName).relations();
+    }
+
+    /**
+     * 指定パッケージおよびサブパッケージ内のクラスを分析し、すべてのクラスと関係を返す。
+     * 関係を1つも持たないクラスも結果に含まれる。
+     *
+     * @param classRoot コンパイル済みクラスのルートディレクトリ
+     * @param packageName 分析対象パッケージ名
+     * @return スキャンしたクラスと検出された関係
+     * @throws NullPointerException classRootまたはpackageNameがnullの場合
+     */
+    public ScanResult scanAll(Path classRoot, String packageName) {
         Objects.requireNonNull(classRoot, "classRoot must not be null");
         Objects.requireNonNull(packageName, "packageName must not be null");
 
         var packageDir = classRoot.resolve(packageName.replace('.', '/'));
         if (!Files.isDirectory(packageDir)) {
-            return List.of();
+            return new ScanResult(List.of(), List.of());
         }
 
         var targetClassNames = collectClassNames(classRoot, packageDir);
         if (targetClassNames.isEmpty()) {
-            return List.of();
+            return new ScanResult(List.of(), List.of());
         }
 
         return analyzeRelations(classRoot, targetClassNames);
     }
 
-    private List<ClassRelation> analyzeRelations(Path classRoot, Set<String> targetClassNames) {
+    private ScanResult analyzeRelations(Path classRoot, Set<String> targetClassNames) {
         var stereotypes = collectStereotypes(classRoot, targetClassNames);
         var classInfoCache = buildClassInfoCache(targetClassNames, stereotypes);
         var relations = new ArrayList<ClassRelation>();
@@ -107,7 +121,11 @@ public class ClassRelationScanner {
             }
         }
 
-        return List.copyOf(relations);
+        // Sort so that the order of classes without relations does not depend on HashSet order.
+        var classes = classInfoCache.values().stream()
+            .sorted(Comparator.comparing(ClassInfo::packageName).thenComparing(ClassInfo::simpleName))
+            .toList();
+        return new ScanResult(classes, relations);
     }
 
     private static Map<String, ClassInfo> buildClassInfoCache(Set<String> targetClassNames,
@@ -226,6 +244,24 @@ public class ClassRelationScanner {
         return "";
     }
 
+    private static String extractReturnSection(String methodSig) {
+        int start = methodSig.indexOf('(');
+        if (start < 0) return "";
+        int depth = 0;
+        for (int i = start + 1; i < methodSig.length(); i++) {
+            char c = methodSig.charAt(i);
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ')' && depth == 0) {
+                var rest = methodSig.substring(i + 1);
+                // The throws part starts with '^' and is not a return type.
+                int throwsStart = rest.indexOf('^');
+                return throwsStart < 0 ? rest : rest.substring(0, throwsStart);
+            }
+        }
+        return "";
+    }
+
     private static void addIfDependency(String fqn, Set<String> targetClassNames,
                                          Set<String> fieldFqns, String selfFqn,
                                          Set<String> result) {
@@ -254,7 +290,17 @@ public class ClassRelationScanner {
                     addIfDependency(fqn, targetClassNames, fieldFqns, selfFqn, result);
                 }
             }
-            // 3. Local variable types from Code attribute
+            // 3. Non-generic return type from method descriptor
+            addIfDependency(classDescToBinaryName(desc.returnType()),
+                targetClassNames, fieldFqns, selfFqn, result);
+            // 4. Generic return type from method Signature attribute
+            if (sigAttr.isPresent()) {
+                var returnSection = extractReturnSection(sigAttr.get().signature().stringValue());
+                for (var fqn : extractFqnsFromSignature(returnSection)) {
+                    addIfDependency(fqn, targetClassNames, fieldFqns, selfFqn, result);
+                }
+            }
+            // 5. Local variable types from Code attribute
             var codeAttr = method.findAttribute(Attributes.code());
             if (codeAttr.isPresent()) {
                 var code = codeAttr.get();

@@ -306,4 +306,37 @@ class ClassBoxTest {
         // "X" alone: 1 * 8 + 16 = 24 → clamped to MIN_WIDTH 100
         assertEquals(104, new ClassBox("X", ClassStereotype.INTERFACE).showDetails().width());
     }
+
+    @Test
+    void arrowsOmittedAddsNoteUnderName() {
+        var svg = new ClassBox("App").arrowsOmitted(true).draw();
+        assertTrue(svg.contains(">{arrows omitted}</text>"));
+    }
+
+    @Test
+    void arrowsOmittedIncreasesHeight() {
+        var plain = new ClassBox("App");
+        var omitted = new ClassBox("App").arrowsOmitted(true);
+        assertTrue(omitted.height() > plain.height());
+        assertTrue(omitted.arrowsOmitted());
+    }
+
+    @Test
+    void arrowsOmittedNoteFitsInWidth() {
+        var omitted = new ClassBox("App").arrowsOmitted(true);
+        assertTrue(omitted.width() >= "{arrows omitted}".length() * 8);
+    }
+
+    @Test
+    void arrowsOmittedWorksWithStereotypeAndDetails() {
+        var svg = new ClassBox("Port", ClassStereotype.INTERFACE, List.of("id: int"), List.of())
+            .showDetails().arrowsOmitted(true).draw();
+        assertTrue(svg.contains(">{arrows omitted}</text>"));
+        assertTrue(svg.indexOf(">Port</text>") < svg.indexOf(">{arrows omitted}</text>"));
+    }
+
+    @Test
+    void drawWithoutArrowsOmittedHasNoNote() {
+        assertFalse(new ClassBox("App").draw().contains("arrows omitted"));
+    }
 }

@@ -1,5 +1,6 @@
 package com.sosuisha.classdiagram;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -28,6 +29,7 @@ public final class ClassBox implements SvgElement {
     private static final double SKETCH_MAX_SOME = 1.5;
     private static final double SKETCH_MAX_FULL = 2.0;
     private static final String DEFAULT_STROKE_COLOR = "#000000";
+    private static final String ARROWS_OMITTED_NOTE = "{arrows omitted}";
 
     private final ClassStereotype stereotype;
     private final String name;
@@ -39,6 +41,7 @@ public final class ClassBox implements SvgElement {
     private String strokeColor = DEFAULT_STROKE_COLOR;
     private boolean showDetails = false;
     private boolean picturesque = false;
+    private boolean arrowsOmitted = false;
 
     /**
      * フィールドとメソッドを指定せずにClassBoxを生成する（stereotype = NONE）。
@@ -169,14 +172,29 @@ public final class ClassBox implements SvgElement {
     }
 
     /**
+     * このクラスの線が省略されていることを示す注記の表示を切り替える。
+     * 有効にすると、クラス名の下に {@code {arrows omitted}} を表示する。
+     *
+     * @param arrowsOmitted 注記を表示する場合は {@code true}
+     * @return このClassBox自身（メソッドチェーン用）
+     */
+    public ClassBox arrowsOmitted(boolean arrowsOmitted) {
+        this.arrowsOmitted = arrowsOmitted;
+        return this;
+    }
+
+    /** @return 線の省略を示す注記を表示する場合は {@code true} */
+    public boolean arrowsOmitted() { return arrowsOmitted; }
+
+    /**
      * コンテンツから自動計算した幅を返す。
      *
      * @return 幅（px）
      */
     public int width() {
-        int maxLen = name.length();
-        if (stereotype != ClassStereotype.NONE) {
-            maxLen = Math.max(maxLen, stereotype.label().length());
+        int maxLen = 0;
+        for (var line : nameLines()) {
+            maxLen = Math.max(maxLen, line.text().length());
         }
         if (showDetails) {
             for (var f : fields) {
@@ -195,8 +213,8 @@ public final class ClassBox implements SvgElement {
      * @return 高さ（px）
      */
     public int height() {
-        int nameLines = stereotype == ClassStereotype.NONE ? 1 : 2;
-        int h = showDetails ? compartmentHeight(nameLines) : nameOnlyCompartmentHeight(nameLines);
+        int nameLineCount = nameLines().size();
+        int h = showDetails ? compartmentHeight(nameLineCount) : nameOnlyCompartmentHeight(nameLineCount);
         if (showDetails) {
             h += compartmentHeight(fields.size())
                + compartmentHeight(methods.size());
@@ -314,35 +332,29 @@ public final class ClassBox implements SvgElement {
         return lineCount * FONT_SIZE + (lineCount - 1) * LINE_GAP + NAME_ONLY_PADDING_Y * 2;
     }
 
+    private record NameLine(String text, int fontSize) {}
+
+    private List<NameLine> nameLines() {
+        var lines = new ArrayList<NameLine>();
+        if (stereotype != ClassStereotype.NONE) {
+            lines.add(new NameLine(stereotype.label(), FONT_SIZE - 2));
+        }
+        lines.add(new NameLine(name, FONT_SIZE));
+        if (arrowsOmitted) {
+            lines.add(new NameLine(ARROWS_OMITTED_NOTE, FONT_SIZE - 2));
+        }
+        return lines;
+    }
+
     private int appendNameCompartment(StringBuilder sb, int width, int startY) {
-        if (!showDetails) {
-            if (stereotype == ClassStereotype.NONE) {
-                int textY = startY + NAME_ONLY_PADDING_Y + ASCENT;
-                sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-                    width / 2, textY, FONT_SIZE, name));
-                return nameOnlyCompartmentHeight(1);
-            }
-            int stereoY = startY + NAME_ONLY_PADDING_Y + ASCENT;
-            int nameY = startY + NAME_ONLY_PADDING_Y + ASCENT + FONT_SIZE + LINE_GAP;
+        var lines = nameLines();
+        int paddingY = showDetails ? PADDING_Y : NAME_ONLY_PADDING_Y;
+        for (int i = 0; i < lines.size(); i++) {
+            int baseline = startY + paddingY + ASCENT + i * (FONT_SIZE + LINE_GAP);
             sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-                width / 2, stereoY, FONT_SIZE - 2, stereotype.label()));
-            sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-                width / 2, nameY, FONT_SIZE, name));
-            return nameOnlyCompartmentHeight(2);
+                width / 2, baseline, lines.get(i).fontSize(), lines.get(i).text()));
         }
-        if (stereotype == ClassStereotype.NONE) {
-            int textY = startY + PADDING_Y + ASCENT;
-            sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-                width / 2, textY, FONT_SIZE, name));
-            return compartmentHeight(1);
-        }
-        int stereoY = startY + PADDING_Y + ASCENT;
-        int nameY = startY + PADDING_Y + ASCENT + FONT_SIZE + LINE_GAP;
-        sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-            width / 2, stereoY, FONT_SIZE - 2, stereotype.label()));
-        sb.append("<text x=\"%d\" y=\"%d\" font-size=\"%d\" text-anchor=\"middle\">%s</text>".formatted(
-            width / 2, nameY, FONT_SIZE, name));
-        return compartmentHeight(2);
+        return showDetails ? compartmentHeight(lines.size()) : nameOnlyCompartmentHeight(lines.size());
     }
 
     private int appendTextCompartment(StringBuilder sb, List<String> lines, int width, int startY) {

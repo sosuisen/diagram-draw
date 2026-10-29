@@ -4,6 +4,7 @@ import com.sosuisha.classdiagram.ClassStereotype;
 import com.sosuisha.classdiagram.DependencyType;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClassRelationScannerTest {
@@ -193,5 +194,51 @@ class ClassRelationScannerTest {
                         && r.targetClassInfo().simpleName().equals("FixtureSelfPart")
                         && r.type() == DependencyType.AGGREGATION),
                 "FixtureSelfSettings.part must still be detected");
+    }
+
+    private static final String FIXISO_PKG = "com.sosuisha.classdiagram.analyzer.fixiso";
+
+    private static ClassInfo findClass(ScanResult result, String simpleName) {
+        return result.classes().stream()
+                .filter(c -> c.simpleName().equals(simpleName))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void scanDetectsDependencyFqnForReturnType() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXISO_PKG);
+        assertTrue(findClass(result, "FixtureIsoRepository").dependencyTargetFqns()
+                .contains(FIXISO_PKG + ".FixtureIsoModel"));
+    }
+
+    @Test
+    void scanDetectsDependencyFqnForGenericReturnType() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXISO_PKG);
+        assertTrue(findClass(result, "FixtureIsoRepository").dependencyTargetFqns()
+                .contains(FIXISO_PKG + ".FixtureIsoItem"));
+    }
+
+    @Test
+    void scanAllReturnsClassesWithoutRelations() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXISO_PKG);
+        var names = result.classes().stream().map(ClassInfo::simpleName).toList();
+        assertTrue(names.containsAll(List.of(
+                "FixtureIsoRepository", "FixtureIsoStore", "FixtureIsoModel",
+                "FixtureIsoItem", "FixtureIsoHelper", "FixtureIsoHelperUser")));
+    }
+
+    @Test
+    void scanAllSharesClassInfoInstancesWithRelations() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXISO_PKG);
+        var repository = findClass(result, "FixtureIsoRepository");
+        assertTrue(result.relations().stream().anyMatch(r -> r.sourceClassInfo() == repository));
+    }
+
+    @Test
+    void scanAllReturnsEmptyResultForNonExistentPackage() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, "com.does.not.exist");
+        assertTrue(result.classes().isEmpty());
+        assertTrue(result.relations().isEmpty());
     }
 }

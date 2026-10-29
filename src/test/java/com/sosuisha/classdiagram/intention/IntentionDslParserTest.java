@@ -338,4 +338,49 @@ class IntentionDslParserTest {
         assertEquals(1, ex.lineNumber());
         assertTrue(ex.getMessage().contains("invalid arrow statement"));
     }
+
+    // --- omit arrows ---
+
+    @Test
+    void parseOmitArrowsStatement() {
+        var result = new IntentionDslParser().parse("omit arrows of App");
+        assertEquals(List.of(new OmitArrowsConstraint("App", 1)), result.omitArrowsConstraints());
+    }
+
+    @Test
+    void parseOmitArrowsKeepsOtherStatements() {
+        var result = new IntentionDslParser().parse("""
+            place B below A
+            omit arrows of App
+            arrow A B from bottom
+            """);
+        assertEquals(1, result.placeConstraints().size());
+        assertEquals(1, result.arrowConstraints().size());
+        assertEquals(2, result.omitArrowsConstraints().getFirst().lineNumber());
+    }
+
+    @Test
+    void parseOmitArrowsWithoutOfThrows() {
+        var ex = assertThrows(IntentionParseException.class,
+            () -> new IntentionDslParser().parse("omit arrows App"));
+        assertEquals(1, ex.lineNumber());
+    }
+
+    @Test
+    void parseOmitArrowsWithExtraTokenThrows() {
+        assertThrows(IntentionParseException.class,
+            () -> new IntentionDslParser().parse("omit arrows of App Launcher"));
+    }
+
+    @Test
+    void parseOmitWithoutArrowsThrows() {
+        assertThrows(IntentionParseException.class,
+            () -> new IntentionDslParser().parse("omit lines of App"));
+    }
+
+    @Test
+    void parseResultWithTwoListsHasNoOmitArrowsConstraints() {
+        var result = new ParseResult(List.of(), List.of());
+        assertTrue(result.omitArrowsConstraints().isEmpty());
+    }
 }

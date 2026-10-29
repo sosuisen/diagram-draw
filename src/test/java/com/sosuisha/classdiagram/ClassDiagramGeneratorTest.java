@@ -1,7 +1,9 @@
 package com.sosuisha.classdiagram;
 
 import org.junit.jupiter.api.Test;
+import com.sosuisha.classdiagram.intention.IntentionParseException;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClassDiagramGeneratorTest {
@@ -254,5 +256,130 @@ class ClassDiagramGeneratorTest {
             .generate(Path.of("target/test-classes"),
                       "com.sosuisha.classdiagram.analyzer.fixself");
         assertTrue(svg.contains("FixtureSelfSettings"));
+    }
+
+    private static final String FIXISO_PKG = "com.sosuisha.classdiagram.analyzer.fixiso";
+
+    @Test
+    void generateDrawsClassesWithoutRelations() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureIsoModel\""));
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureIsoHelper\""));
+    }
+
+    @Test
+    void generateDrawsDependencyArrowsToAndAmongClassesWithoutRelations() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        // Repository -> IsoModel, Repository -> IsoItem, HelperUser -> Helper
+        assertEquals(3, countOccurrences(svg, "data-diagram-draw-type=\"dependency\""));
+    }
+
+    @Test
+    void generateDrawsClassesWithoutRelationsWithSubPackageGrouping() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(20)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureIsoModel\""));
+    }
+
+    @Test
+    void generateDrawsClassesWhenPackageHasNoRelationAtAll() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixnorel");
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureNoRelA\""));
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureNoRelB\""));
+    }
+
+    private static int countOccurrences(String text, String pattern) {
+        int count = 0;
+        for (int i = text.indexOf(pattern); i >= 0; i = text.indexOf(pattern, i + 1)) {
+            count++;
+        }
+        return count;
+    }
+
+    @Test
+    void generateDrawsOneFrameForPackageSharedByConnectedComponents() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(20)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixmerge");
+        assertEquals(1, countOccurrences(svg,
+            "data-diagram-draw=\"package-group\" data-diagram-draw-name=\"model\""));
+        assertEquals(1, countOccurrences(svg,
+            "data-diagram-draw=\"package-group\" data-diagram-draw-name=\"service\""));
+    }
+
+    @Test
+    void generatePutsClassWithoutRelationsInFrameOfItsPackage() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(20)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixmerge");
+        int[] frame = translateOf(svg, "model");
+        int[] user = translateOf(svg, "FixtureMergeUser");
+        assertTrue(user[0] > frame[0] && user[1] > frame[1],
+            "FixtureMergeUser must be inside the model frame");
+    }
+
+    private static int[] translateOf(String svg, String name) {
+        var matcher = Pattern.compile(
+            "data-diagram-draw-name=\"" + Pattern.quote(name) + "\" transform=\"translate\\((\\d+),(\\d+)\\)\"")
+            .matcher(svg);
+        assertTrue(matcher.find(), "element not found: " + name);
+        return new int[]{Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2))};
+    }
+
+    @Test
+    void omitArrowsRemovesAllLinesOfTheClass() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("omit arrows of FixtureIsoRepository")
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        // Only HelperUser -> Helper remains. Repository's composition and two dependencies are gone.
+        assertEquals(1, countOccurrences(svg, "data-diagram-draw=\"dependency\""));
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureIsoStore\""),
+            "omitting arrows must not remove the boxes at the other end");
+    }
+
+    @Test
+    void omitArrowsMarksTheClassBox() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("omit arrows of FixtureIsoRepository")
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        var box = svg.substring(svg.indexOf("data-diagram-draw-name=\"FixtureIsoRepository\""));
+        assertTrue(box.substring(0, box.indexOf("</g>")).contains("{arrows omitted}"));
+    }
+
+    @Test
+    void omitArrowsOfUnknownClassThrows() {
+        var generator = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("omit arrows of NoSuchClass");
+        assertThrows(IntentionParseException.class,
+            () -> generator.generate(Path.of("target/test-classes"), FIXISO_PKG));
+    }
+
+    @Test
+    void arrowConstraintOnOmittedClassThrows() {
+        var generator = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .intention("""
+                omit arrows of FixtureIsoHelper
+                arrow FixtureIsoHelperUser FixtureIsoHelper from bottom
+                """);
+        var ex = assertThrows(IntentionParseException.class,
+            () -> generator.generate(Path.of("target/test-classes"), FIXISO_PKG));
+        assertEquals(2, ex.lineNumber());
+    }
+
+    @Test
+    void generatePutsPackageReferencedBySiblingsInRightColumn() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(20)
+            .generate(Path.of("target/test-classes"), "com.sosuisha.classdiagram.analyzer.fixcol");
+        int coreX = translateOf(svg, "core")[0];
+        int uiRight = translateOf(svg, "FixtureColView")[0] + new ClassBox("FixtureColView").width();
+        int infraRight = translateOf(svg, "FixtureColRepositoryImpl")[0]
+            + new ClassBox("FixtureColRepositoryImpl").width();
+        assertTrue(coreX > uiRight, "core must be right of ui");
+        assertTrue(coreX > infraRight, "core must be right of infra");
     }
 }

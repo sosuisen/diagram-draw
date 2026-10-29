@@ -28,6 +28,7 @@ com.sosuisha.classdiagram
 │   ├── ClassInfo.java                 クラス識別子（final class）
 │   ├── ClassRelation.java             クラス間関係（record）
 │   ├── ClassRelationScanner.java      .classファイルスキャナー
+│   ├── ScanResult.java                スキャン結果（全クラス＋関係、record）
 │   ├── ClassRelationSorter.java       トポロジカルソーター
 │   ├── ConnectedComponentSplitter.java 連結成分分割器
 │   └── CircularRelationException.java 循環参照例外
@@ -37,7 +38,8 @@ com.sosuisha.classdiagram
     ├── PlaceConstraint.java           パース済み place 制約（record）
     ├── ArrowEdge.java                 矢印アンカー辺列挙型（TOP / BOTTOM / LEFT / RIGHT）
     ├── ArrowConstraint.java           パース済み arrow 制約（record）
-    ├── ParseResult.java               パーサー出力（PlaceConstraint + ArrowConstraint の両リスト）
+    ├── OmitArrowsConstraint.java      パース済み omit arrows of 制約（record）
+    ├── ParseResult.java               パーサー出力（place / arrow / omit の各制約リスト）
     └── IntentionDslParser.java        DSL パーサー
 └── maven/
     └── GenerateMojo.java              Maven ゴール classdiagram:generate
@@ -361,6 +363,7 @@ public record ClassRelation(
 
 ```java
 List<ClassRelation> scan(Path classRoot, String packageName)
+ScanResult scanAll(Path classRoot, String packageName)  // 関係を持たないクラスも含む
 ```
 
 #### スキャン対象
@@ -375,7 +378,7 @@ List<ClassRelation> scan(Path classRoot, String packageName)
 | **COMPOSITION** | フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数に同型がない |
 | **AGGREGATION** | フィールドの型がターゲットパッケージ内のクラスで、コンストラクタ引数に同型がある |
 | **REALIZATION** | `implements` でターゲットパッケージ内のインタフェースを実装している |
-| **DEPENDENCY** | メソッドのパラメータ型／ジェネリックパラメータ／ローカル変数型がターゲットパッケージ内のクラス（自分自身およびフィールド型を除く） |
+| **DEPENDENCY** | メソッドのパラメータ型／戻り値型／ローカル変数型（ジェネリック引数を含む）がターゲットパッケージ内のクラス（自分自身およびフィールド型を除く） |
 
 - `ACC_ENUM` フラグを持つフィールド（enum 定数）は対象外（自己参照による誤検出を防ぐため）
 - 自クラスと同じ型のフィールド（`DEFAULT` 定数やシングルトンの `INSTANCE` など）は対象外（自己ループがトポロジカルソートで循環と判定されるため）
@@ -392,8 +395,10 @@ List<ClassRelation> scan(Path classRoot, String packageName)
 
 1. メソッド記述子のパラメータ型（非ジェネリック）
 2. メソッド `Signature` 属性（ジェネリックパラメータ）
-3. `Code` 属性内の `LocalVariableTable`（非ジェネリック）
-4. `Code` 属性内の `LocalVariableTypeTable`（ジェネリック）
+3. メソッド記述子の戻り値型（非ジェネリック）
+4. メソッド `Signature` 属性の戻り値部分（ジェネリック。`^` 以降の throws 部分は除く）
+5. `Code` 属性内の `LocalVariableTable`（非ジェネリック）
+6. `Code` 属性内の `LocalVariableTypeTable`（ジェネリック）
 
 自クラス自身およびフィールド型として既に検出されているクラスは除外。
 
@@ -505,13 +510,15 @@ LayoutResult layout(List<List<ClassInfo>> layers, List<ClassRelation> relations)
 
 #### サブパッケージグルーピング
 
-`enableSubPackageGrouping(rootPackage, packageGap)` を呼ぶと、ConnectedComponent 内をパッケージツリーに分解し再配置する:
+`enableSubPackageGrouping(rootPackage, packageGap)` を呼ぶと、図全体をパッケージツリーに分解し再配置する:
 
-1. 各 ConnectedComponent のクラス群から `rootPackage` 基準の相対パスでパッケージツリーを構築
+1. 全クラスから `rootPackage` 基準の相対パスで**1つの**パッケージツリーを構築する。ConnectedComponent ごとには分けない（同じパッケージの矩形が成分ごとに重複して描かれるのを防ぐため）。このモードでは `groupGap` は使われない
 2. ツリーを再帰的にレイアウト:
    - 直接クラスは上部に1スロットとして縦配置（同じ元レイヤーインデックスのクラスを同一行に中央寄せ）
    - 子ノード（サブパッケージ）はその下に **2D スカイラインの Bottom-Left fill** で詰め込み
    - 子の挿入順は重心法でソート（兄弟間 relation の重心で並べる）
+   - 兄弟パッケージから参照されるだけで、兄弟パッケージを参照しない子（レイヤードアーキテクチャの domain など）は、スカイラインに入れず右の列に縦に積む。参照には関係（COMPOSITION / AGGREGATION / REALIZATION）と DEPENDENCY の両方を数える。パッケージ名では判定しない（利用者のプロジェクトで名前が異なるため）
+   - 右の列に置くノードとその子孫は「列モード」で配置する。子パッケージはスカイラインではなく縦に積み、直接クラスの行は `COLUMN_MODE_MAX_CLASSES_PER_ROW`（2）個で折り返す。右の列が横に広がると、左側の下に大きな空白ができるため
 3. 非ルートノード（`localLabel != ""`）は `PackageGroupBox` で囲む
 4. ルートパッケージのクラスは矩形なしで上端配置
 5. パッケージ矩形の塗り色は階層深度に応じて `factor = 0.9^(depth-1)` で暗化される
@@ -559,12 +566,14 @@ public String generate(Path classRoot, String packageName)
 #### 内部パイプライン
 
 ```
-ClassRelationScanner.scan()
-        ↓ List<ClassRelation>
-ConnectedComponentSplitter.split()
+ClassRelationScanner.scanAll()
+        ↓ ScanResult (classes, relations)
+ConnectedComponentSplitter.split(relations)
         ↓ List<ClassRelation>  (ClassInfo.groupIndex 設定済み)
-ClassRelationSorter.sort()
+ClassRelationSorter.sort(relations)
         ↓ List<List<ClassInfo>>
+関係を持たないクラスを追加
+        ↓ List<List<ClassInfo>>  (1つの追加グループとして最上位レイヤーに加える)
 ClassDiagramLayout.layout()
         ↓ LayoutResult (boxes, dependencies, packageGroups, w, h)
 SVGBuilder
@@ -575,7 +584,11 @@ SVGBuilder
         ↓ String (SVG)
 ```
 
-関係が0件の場合は `canvasPaddingX * 2` × `canvasPaddingY * 2` の空 SVG を返す。
+クラスが0件の場合は `canvasPaddingX * 2` × `canvasPaddingY * 2` の空 SVG を返す。
+
+関係を持たないクラスもボックスとして描画する。これらは1つの追加グループ（`groupIndex` = 既存の最大値 + 1）にまとめ、最上位レイヤーに置く。クラスごとに別グループにしないのは、サブパッケージグルーピング時にクラスごとの矩形ができるのを防ぐため。
+
+DEPENDENCY 矢印は通常、異なるグループ間にのみ描く。ただし、関係を持たないクラスから出る依存は、同じ追加グループ内でも描く。ほかの線でつながっていないため。
 
 `enableSubPackageGrouping` は `ClassDiagramLayout` 側に `packageName` を渡して有効化する。
 
@@ -798,12 +811,14 @@ public record ArrowConstraint(
 
 ```java
 public record ParseResult(
-    List<PlaceConstraint> placeConstraints,   // 変更不可リスト
-    List<ArrowConstraint> arrowConstraints    // 変更不可リスト
+    List<PlaceConstraint> placeConstraints,           // 変更不可リスト
+    List<ArrowConstraint> arrowConstraints,           // 変更不可リスト
+    List<OmitArrowsConstraint> omitArrowsConstraints  // 変更不可リスト
 )
+// omitArrowsConstraints を空にする2引数コンストラクタもある
 ```
 
-両リストは null 禁止かつ `List.copyOf()` でラップされたイミュータブルリスト。
+各リストは null 禁止かつ `List.copyOf()` でラップされたイミュータブルリスト。
 
 ### `IntentionDslParser` クラス
 
@@ -840,6 +855,18 @@ arrow <source> <target> from <fromEdge> to <toEdge>
 
 不明な辺トークンは `"unknown edge: '<token>'"` でエラー。
 
+#### omit 構文
+
+```
+omit arrows of <class>
+```
+
+- トークン数は4。`arrows` と `of` は固定
+- 指定クラスに接続するすべての線（COMPOSITION / AGGREGATION / REALIZATION / DEPENDENCY）を描画しない。配置は変わらない
+- 指定クラスのボックスにはクラス名の下に `{arrows omitted}`（font-size 12）を表示する。注記の分だけボックスが高くなるため、座標計算の前に設定する
+- 存在しないクラスを指定すると `IntentionParseException`
+- 線を省略したクラスを `arrow` 文で指定すると `IntentionParseException`
+
 #### エラー一覧
 
 | 状況 | メッセージ例 |
@@ -849,6 +876,9 @@ arrow <source> <target> from <fromEdge> to <toEdge>
 | arrow 構文不正 | `line 1: invalid arrow statement` |
 | 不明な辺トークン | `line 1: unknown edge: 'side'` |
 | A→B 関係が存在しない | `line 1: no relation from 'A' to 'B'` |
+| omit 構文不正 | `line 1: invalid omit statement` |
+| omit で存在しないクラス | `line 1: unknown class: 'A'` |
+| 線を省略したクラスへの arrow | `line 2: arrows of 'A' are omitted` |
 
 #### 語彙の使い分け
 

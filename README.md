@@ -75,11 +75,14 @@ It finds four kinds of relations.
 | Composition | A field has the type of another class. The constructor does not take that type. | Filled diamond |
 | Aggregation | A field has the type of another class. The constructor takes that type. | Hollow diamond |
 | Realization | A class implements an interface. | Dashed line with a hollow triangle |
-| Dependency | A method parameter or a local variable has the type of another class. | Dashed line with an open arrow |
+| Dependency | A method parameter, a return value or a local variable has the type of another class. | Dashed line with an open arrow |
 
 A field of type `List<T>` and other collections counts as a relation to `T`.
 
 Classes in each subpackage are grouped in a package frame.
+Each package has one frame, even when its classes are not connected to each other.
+
+Classes without any relation are also drawn.
 
 ## Parameters
 
@@ -136,7 +139,7 @@ Pass the file with the `intentionFile` parameter.
 mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.1:generate -Dclassdiagram.package=com.example -Dclassdiagram.intentionFile=diagram.intention
 ```
 
-The file has two kinds of statements.
+The file has three kinds of statements.
 Write one statement per line.
 A line that starts with `#` is a comment.
 
@@ -164,6 +167,19 @@ arrow <from class> <to class> from <side> to <side>
 
 The two classes must have a relation.
 If they do not, the build fails.
+
+### omit
+
+Hides all lines of a class.
+Use it for a class that is connected to many classes, such as a class that starts the application.
+
+```
+omit arrows of App
+```
+
+The class box stays in the diagram.
+The box shows `{arrows omitted}` under the class name.
+This tells readers that the lines are hidden on purpose.
 
 ## Limitations
 

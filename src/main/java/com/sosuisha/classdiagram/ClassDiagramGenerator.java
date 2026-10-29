@@ -3,7 +3,12 @@ package com.sosuisha.classdiagram;
 import com.sosuisha.classdiagram.analyzer.ConnectedComponentSplitter;
 import com.sosuisha.classdiagram.analyzer.ClassRelationScanner;
 import com.sosuisha.classdiagram.analyzer.ClassRelationSorter;
+import com.sosuisha.classdiagram.analyzer.ClassInfo;
+import com.sosuisha.classdiagram.analyzer.ClassRelation;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -213,15 +218,17 @@ public class ClassDiagramGenerator {
         Objects.requireNonNull(classRoot, "classRoot must not be null");
         Objects.requireNonNull(packageName, "packageName must not be null");
 
-        var relations = new ClassRelationScanner().scan(classRoot, packageName);
-        if (relations.isEmpty()) {
+        var scanResult = new ClassRelationScanner().scanAll(classRoot, packageName);
+        if (scanResult.classes().isEmpty()) {
             var builder = new SVGBuilder(canvasPaddingX * 2, canvasPaddingY * 2);
             if (fontFamily != null) builder.fontFamily(fontFamily);
             return builder.build();
         }
 
+        var relations = scanResult.relations();
         new ConnectedComponentSplitter().split(relations);
-        var layers = new ClassRelationSorter().sort(relations);
+        var layers = addClassesWithoutRelations(
+            new ClassRelationSorter().sort(relations), scanResult.classes(), relations);
         var layoutEngine = new ClassDiagramLayout(horizontalGap, verticalGap, canvasPaddingX, canvasPaddingY, groupGap);
         if (packageGapForGrouping >= 0) {
             layoutEngine.enableSubPackageGrouping(packageName, packageGapForGrouping);
@@ -246,5 +253,38 @@ public class ClassDiagramGenerator {
         result.boxes().forEach(builder::add);
         result.dependencies().forEach(builder::add);
         return builder.build();
+    }
+
+    /**
+     * 関係を持たないクラスを1つの追加グループにまとめ、最上位レイヤーに加える。
+     */
+    private static List<List<ClassInfo>> addClassesWithoutRelations(
+            List<List<ClassInfo>> layers, List<ClassInfo> classes, List<ClassRelation> relations) {
+        var related = new HashSet<ClassInfo>();
+        int nextGroupIndex = 0;
+        for (var rel : relations) {
+            related.add(rel.sourceClassInfo());
+            related.add(rel.targetClassInfo());
+            nextGroupIndex = Math.max(nextGroupIndex, rel.sourceClassInfo().groupIndex() + 1);
+        }
+        var unrelated = classes.stream().filter(c -> !related.contains(c)).toList();
+        if (unrelated.isEmpty()) {
+            return layers;
+        }
+        // One shared group, not one group per class. With sub-package grouping,
+        // one group per class would draw a separate package frame around every class.
+        for (var info : unrelated) {
+            info.setGroupIndex(nextGroupIndex);
+        }
+        var result = new ArrayList<List<ClassInfo>>();
+        if (layers.isEmpty()) {
+            result.add(unrelated);
+        } else {
+            var topLayer = new ArrayList<>(layers.getFirst());
+            topLayer.addAll(unrelated);
+            result.add(topLayer);
+            result.addAll(layers.subList(1, layers.size()));
+        }
+        return result;
     }
 }

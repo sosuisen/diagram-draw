@@ -6,12 +6,14 @@ import com.sosuisha.classdiagram.intention.ArrowConstraint;
 import com.sosuisha.classdiagram.intention.ArrowEdge;
 import com.sosuisha.classdiagram.intention.IntentionDslParser;
 import com.sosuisha.classdiagram.intention.IntentionParseException;
+import com.sosuisha.classdiagram.intention.OmitArrowsConstraint;
 import com.sosuisha.classdiagram.intention.PlaceConstraint;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -57,6 +59,7 @@ public class ClassDiagramLayout {
     private boolean picturesque = false;
     private List<PlaceConstraint> placeConstraints = List.of();
     private List<ArrowConstraint> arrowConstraints = List.of();
+    private List<OmitArrowsConstraint> omitArrowsConstraints = List.of();
     private static final double PACKAGE_DEPTH_DARKEN_FACTOR = 0.9;
 
     /**
@@ -194,7 +197,7 @@ public class ClassDiagramLayout {
     }
 
     /**
-     * intention DSL文字列をパースして配置制約および矢印制約を設定する。
+     * intention DSL文字列をパースして配置制約・矢印制約・線の省略を設定する。
      *
      * @param dsl intention DSL文字列（複数行可）
      * @return このレイアウト自身（メソッドチェーン用）
@@ -206,6 +209,7 @@ public class ClassDiagramLayout {
         var parsed = new IntentionDslParser().parse(dsl);
         this.placeConstraints = parsed.placeConstraints();
         this.arrowConstraints = parsed.arrowConstraints();
+        this.omitArrowsConstraints = parsed.omitArrowsConstraints();
         return this;
     }
 
@@ -274,6 +278,8 @@ public class ClassDiagramLayout {
                 boxMap.put(info, box);
             }
         }
+        // Mark before positioning, because the note makes the box taller.
+        var omittedNames = markArrowsOmittedBoxes(boxMap.values());
 
         // 辺交差の最小化（重心法）
         var orderedLayers = minimizeCrossings(layers, relations);
@@ -386,11 +392,18 @@ public class ClassDiagramLayout {
             fqnToInfo.put(info.packageName() + "." + info.simpleName(), info);
         }
         var implToIfaceInfos = buildImplToIfaceInfosMap(relations, fqnToInfo);
+        var relatedInfos = new HashSet<ClassInfo>();
+        for (var rel : relations) {
+            relatedInfos.add(rel.sourceClassInfo());
+            relatedInfos.add(rel.targetClassInfo());
+        }
         for (var srcInfo : boxMap.keySet()) {
             for (var fqn : srcInfo.dependencyTargetFqns()) {
                 var tgtInfo = fqnToInfo.get(fqn);
                 if (tgtInfo == null) continue;
-                if (srcInfo.groupIndex() == tgtInfo.groupIndex()) continue;
+                // Classes without relations share one group but are not connected by
+                // any other line, so dependencies between them must still be drawn.
+                if (srcInfo.groupIndex() == tgtInfo.groupIndex() && relatedInfos.contains(srcInfo)) continue;
                 if (isCoveredByInterface(fqn, srcInfo, implToIfaceInfos)) continue;
                 var src = boxMap.get(srcInfo);
                 var tgt = boxMap.get(tgtInfo);
@@ -399,6 +412,9 @@ public class ClassDiagramLayout {
                 }
             }
         }
+
+        dependencies.removeIf(d -> omittedNames.contains(d.source().name())
+            || omittedNames.contains(d.target().name()));
 
         // Step 9: optional sub-package grouping — rebuild positions per (groupIndex, packageName) slot.
         var packageGroups = new ArrayList<PackageGroupBox>();
@@ -421,7 +437,7 @@ public class ClassDiagramLayout {
 
         // Step 10: spread endpoints of edges sharing the same (box, edge) slot so that
         // multiple incident edges don't bunch up at a single point.
-        applyArrowConstraints(dependencies);
+        applyArrowConstraints(dependencies, omittedNames);
         spreadDependencyEndpoints(dependencies);
 
         return new LayoutResult(
@@ -561,25 +577,18 @@ public class ClassDiagramLayout {
             }
         }
 
-        // Group classes by groupIndex (preserve insertion order).
-        Map<Integer, List<ClassInfo>> byGroup = new LinkedHashMap<>();
+        // One package tree for the whole diagram, not one per connected component.
+        // Per-component trees drew the same package frame once for each component.
+        var allClasses = new ArrayList<ClassInfo>();
         for (var layer : orderedLayers) {
-            for (var info : layer) {
-                byGroup.computeIfAbsent(info.groupIndex(), k -> new ArrayList<>()).add(info);
-            }
+            allClasses.addAll(layer);
         }
 
         var result = new ArrayList<PackageGroupBox>();
-        int currentGroupX = canvasPaddingX;
         // Clamp slot startY so any non-root PackageGroupBox top edge is never negative.
         int slotStartY = Math.max(canvasPaddingY, GROUP_PADDING_TOP);
-
-        for (var groupEntry : byGroup.entrySet()) {
-            var ccRoot = buildPackageTree(groupEntry.getValue());
-            var dims = layoutPackageNode(ccRoot, currentGroupX, slotStartY, 0,
-                originalLayerIndex, boxMap, result, relations);
-            currentGroupX += dims.width() + groupGap;
-        }
+        layoutPackageNode(buildPackageTree(allClasses), canvasPaddingX, slotStartY, 0, false,
+            originalLayerIndex, boxMap, result, relations);
 
         // Render order: outer rectangles must be drawn first so deeper (nested) ones
         // sit on top. layoutPackageNode appends innermost-first (post-order recursion);
@@ -636,11 +645,13 @@ public class ClassDiagramLayout {
      * @param x     ノード自身の矩形（あれば）の左上 X 座標
      * @param y     ノード自身の矩形（あれば）の左上 Y 座標
      * @param depth このノードの矩形のネスト階層（0 = CC ルート、1 = 最外パッケージ矩形、以降深くなるほど増加）
+     * @param columnMode 右の列に置くノードとその子孫なら {@code true}。子パッケージを縦に積み、
+     *                   直接クラスの行を {@link #COLUMN_MODE_MAX_CLASSES_PER_ROW} 個で折り返す
      * @return ノード全体（矩形を含む）の幅・高さ
      */
     private SlotDimensions layoutPackageNode(
             PackageNode node,
-            int x, int y, int depth,
+            int x, int y, int depth, boolean columnMode,
             Map<ClassInfo, Integer> originalLayerIndex,
             Map<ClassInfo, ClassBox> boxMap,
             List<PackageGroupBox> packageGroups,
@@ -654,7 +665,8 @@ public class ClassDiagramLayout {
         int directHeight = 0;
         if (!node.directClasses.isEmpty()) {
             var dims = layoutSingleSlot(
-                node.directClasses, originalLayerIndex, boxMap, contentX, contentY);
+                node.directClasses, originalLayerIndex, boxMap, contentX, contentY,
+                columnMode ? COLUMN_MODE_MAX_CLASSES_PER_ROW : Integer.MAX_VALUE);
             directWidth = dims.width();
             directHeight = dims.height();
         }
@@ -665,37 +677,32 @@ public class ClassDiagramLayout {
 
         var orderedChildren = orderChildrenByBarycenter(node, relations);
         if (!orderedChildren.isEmpty()) {
-            var placements = new ArrayList<ChildPlacement>();
+            var referencedOnly = columnMode
+                ? Set.<PackageNode>of()
+                : findReferencedOnlyChildren(orderedChildren, relations);
+            var packed = new ArrayList<ChildPlacement>();
+            var rightColumn = new ArrayList<ChildPlacement>();
             for (var child : orderedChildren) {
+                boolean inRightColumn = referencedOnly.contains(child);
                 int pgStartIdx = packageGroups.size();
                 var descendants = new ArrayList<ClassInfo>();
                 collectAllDescendants(child, descendants);
-                var dims = layoutPackageNode(child, 0, 0, depth + 1,
+                var dims = layoutPackageNode(child, 0, 0, depth + 1, columnMode || inRightColumn,
                     originalLayerIndex, boxMap, packageGroups, relations);
-                placements.add(new ChildPlacement(
+                var placement = new ChildPlacement(
                     dims.width(), dims.height(),
-                    pgStartIdx, packageGroups.size(), descendants));
+                    pgStartIdx, packageGroups.size(), descendants);
+                // A column-mode node stacks all children to stay narrow.
+                (columnMode || inRightColumn ? rightColumn : packed).add(placement);
             }
 
-            long totalArea = 0;
-            int maxChildWidth = 0;
-            for (var cp : placements) {
-                totalArea += (long) cp.width() * cp.height();
-                maxChildWidth = Math.max(maxChildWidth, cp.width());
-            }
-            int targetMaxWidth = Math.max(maxChildWidth,
-                (int) Math.ceil(Math.sqrt((double) totalArea * 1.5)));
-
-            var skyline = new Skyline();
-            for (var cp : placements) {
-                int[] pos = skyline.findFit(cp.width() + packageGap, targetMaxWidth + packageGap);
-                shiftChildSubtree(cp,
-                    contentX + pos[0], childrenStartY + pos[1],
-                    boxMap, packageGroups);
-                skyline.place(pos[0], pos[1], cp.width() + packageGap, cp.height() + packageGap);
-                childrenWidth = Math.max(childrenWidth, pos[0] + cp.width());
-                childrenHeight = Math.max(childrenHeight, pos[1] + cp.height());
-            }
+            var packedSize = packWithSkyline(packed, contentX, childrenStartY, boxMap, packageGroups);
+            int columnX = packed.isEmpty() ? contentX : contentX + packedSize.width() + packageGap;
+            var columnSize = stackInColumn(rightColumn, columnX, childrenStartY, boxMap, packageGroups);
+            childrenWidth = rightColumn.isEmpty()
+                ? packedSize.width()
+                : (columnX - contentX) + columnSize.width();
+            childrenHeight = Math.max(packedSize.height(), columnSize.height());
         }
 
         int innerMaxWidth = Math.max(directWidth, childrenWidth);
@@ -713,6 +720,90 @@ public class ClassDiagramLayout {
         }
 
         return new SlotDimensions(totalWidth, totalHeight);
+    }
+
+    private SlotDimensions packWithSkyline(
+            List<ChildPlacement> placements, int originX, int originY,
+            Map<ClassInfo, ClassBox> boxMap, List<PackageGroupBox> packageGroups) {
+        long totalArea = 0;
+        int maxChildWidth = 0;
+        for (var cp : placements) {
+            totalArea += (long) cp.width() * cp.height();
+            maxChildWidth = Math.max(maxChildWidth, cp.width());
+        }
+        int targetMaxWidth = Math.max(maxChildWidth,
+            (int) Math.ceil(Math.sqrt((double) totalArea * 1.5)));
+
+        int width = 0;
+        int height = 0;
+        var skyline = new Skyline();
+        for (var cp : placements) {
+            int[] pos = skyline.findFit(cp.width() + packageGap, targetMaxWidth + packageGap);
+            shiftChildSubtree(cp, originX + pos[0], originY + pos[1], boxMap, packageGroups);
+            skyline.place(pos[0], pos[1], cp.width() + packageGap, cp.height() + packageGap);
+            width = Math.max(width, pos[0] + cp.width());
+            height = Math.max(height, pos[1] + cp.height());
+        }
+        return new SlotDimensions(width, height);
+    }
+
+    private SlotDimensions stackInColumn(
+            List<ChildPlacement> placements, int originX, int originY,
+            Map<ClassInfo, ClassBox> boxMap, List<PackageGroupBox> packageGroups) {
+        int width = 0;
+        int y = 0;
+        for (var cp : placements) {
+            if (y > 0) {
+                y += packageGap;
+            }
+            shiftChildSubtree(cp, originX, originY + y, boxMap, packageGroups);
+            y += cp.height();
+            width = Math.max(width, cp.width());
+        }
+        return new SlotDimensions(width, y);
+    }
+
+    /**
+     * 兄弟パッケージから参照されるだけで、兄弟パッケージを参照しない子ノードを返す。
+     * レイヤードアーキテクチャのdomainのように、ほかの兄弟が依存する側のパッケージにあたる。
+     */
+    private Set<PackageNode> findReferencedOnlyChildren(
+            List<PackageNode> children, List<ClassRelation> relations) {
+        if (children.size() <= 1) return Set.of();
+        Map<ClassInfo, Integer> classToChildIdx = new HashMap<>();
+        for (int i = 0; i < children.size(); i++) {
+            collectDescendantClasses(children.get(i), classToChildIdx, i);
+        }
+        Map<String, Integer> fqnToChildIdx = new HashMap<>();
+        classToChildIdx.forEach((info, idx) ->
+            fqnToChildIdx.put(info.packageName() + "." + info.simpleName(), idx));
+
+        int[] incoming = new int[children.size()];
+        int[] outgoing = new int[children.size()];
+        for (var rel : relations) {
+            countSiblingReference(classToChildIdx.get(rel.sourceClassInfo()),
+                classToChildIdx.get(rel.targetClassInfo()), incoming, outgoing);
+        }
+        classToChildIdx.forEach((info, srcIdx) -> {
+            for (var fqn : info.dependencyTargetFqns()) {
+                countSiblingReference(srcIdx, fqnToChildIdx.get(fqn), incoming, outgoing);
+            }
+        });
+
+        var result = new HashSet<PackageNode>();
+        for (int i = 0; i < children.size(); i++) {
+            if (incoming[i] > 0 && outgoing[i] == 0) {
+                result.add(children.get(i));
+            }
+        }
+        return result;
+    }
+
+    private static void countSiblingReference(
+            Integer srcIdx, Integer tgtIdx, int[] incoming, int[] outgoing) {
+        if (srcIdx == null || tgtIdx == null || srcIdx.equals(tgtIdx)) return;
+        outgoing[srcIdx]++;
+        incoming[tgtIdx]++;
     }
 
     private record ChildPlacement(
@@ -882,6 +973,7 @@ public class ClassDiagramLayout {
 
     private static final double EDGE_SPREAD_MARGIN_MAX = 20.0;
     private static final double EDGE_SPREAD_MARGIN_RATIO = 0.15;
+    private static final int COLUMN_MODE_MAX_CLASSES_PER_ROW = 2;
 
     private record AnchorInfo(
         Dependency dep, boolean isSource, ClassBox box,
@@ -890,9 +982,32 @@ public class ClassDiagramLayout {
 
     private record EdgeKey(ClassBox box, Dependency.BoxEdge edge) {}
 
-    private void applyArrowConstraints(List<Dependency> dependencies) {
+    private Set<String> markArrowsOmittedBoxes(Collection<ClassBox> boxes) {
+        var omittedNames = new HashSet<String>();
+        for (var constraint : omitArrowsConstraints) {
+            var matched = boxes.stream()
+                .filter(b -> b.name().equals(constraint.className()))
+                .toList();
+            if (matched.isEmpty()) {
+                throw new IntentionParseException(constraint.lineNumber(),
+                    "unknown class: '" + constraint.className() + "'");
+            }
+            matched.forEach(b -> b.arrowsOmitted(true));
+            omittedNames.add(constraint.className());
+        }
+        return omittedNames;
+    }
+
+    private void applyArrowConstraints(List<Dependency> dependencies, Set<String> omittedNames) {
         if (arrowConstraints.isEmpty()) return;
         for (var constraint : arrowConstraints) {
+            // Without this check the error would say "no relation", which hides the real cause.
+            for (var className : List.of(constraint.source(), constraint.target())) {
+                if (omittedNames.contains(className)) {
+                    throw new IntentionParseException(constraint.lineNumber(),
+                        "arrows of '" + className + "' are omitted");
+                }
+            }
             var matched = dependencies.stream()
                 .filter(d -> d.source().name().equals(constraint.source())
                           && d.target().name().equals(constraint.target()))
@@ -1164,18 +1279,24 @@ public class ClassDiagramLayout {
             List<ClassInfo> members,
             Map<ClassInfo, Integer> originalLayerIndex,
             Map<ClassInfo, ClassBox> boxMap,
-            int startX, int startY) {
+            int startX, int startY, int maxClassesPerRow) {
         // Group by original layer index, sorted ascending.
-        var byLayer = new TreeMap<Integer, List<ClassInfo>>();
+        var byLayerIndex = new TreeMap<Integer, List<ClassInfo>>();
         for (var info : members) {
-            byLayer.computeIfAbsent(originalLayerIndex.get(info), k -> new ArrayList<>()).add(info);
+            byLayerIndex.computeIfAbsent(originalLayerIndex.get(info), k -> new ArrayList<>()).add(info);
+        }
+        var rows = new ArrayList<List<ClassInfo>>();
+        for (var layerMembers : byLayerIndex.values()) {
+            for (int i = 0; i < layerMembers.size(); i += maxClassesPerRow) {
+                rows.add(layerMembers.subList(i, Math.min(i + maxClassesPerRow, layerMembers.size())));
+            }
         }
 
         // Compute each row width and the max width (= slot width).
         var rowWidths = new ArrayList<Integer>();
         var rowMaxHeights = new ArrayList<Integer>();
         int slotWidth = 0;
-        for (var rowMembers : byLayer.values()) {
+        for (var rowMembers : rows) {
             int w = 0;
             int h = 0;
             for (var info : rowMembers) {
@@ -1192,7 +1313,7 @@ public class ClassDiagramLayout {
         // Place each row centered within the slot width.
         int currentY = startY;
         int rowIdx = 0;
-        for (var rowMembers : byLayer.values()) {
+        for (var rowMembers : rows) {
             int rowStartX = startX + (slotWidth - rowWidths.get(rowIdx)) / 2;
             int x = rowStartX;
             for (var info : rowMembers) {
@@ -1204,7 +1325,7 @@ public class ClassDiagramLayout {
             rowIdx++;
         }
 
-        int slotHeight = (currentY - startY) - (byLayer.isEmpty() ? 0 : verticalGap);
+        int slotHeight = (currentY - startY) - (rows.isEmpty() ? 0 : verticalGap);
         return new SlotDimensions(slotWidth, slotHeight);
     }
 

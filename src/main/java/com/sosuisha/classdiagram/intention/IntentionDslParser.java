@@ -8,7 +8,7 @@ import java.util.Objects;
  * intention DSL文字列を解析して {@link ParseResult} を返すパーサー。
  *
  * <p>1行に1文を記述する。空行および {@code #} で始まるコメント行はスキップ。
- * サポートする動詞: {@code place}, {@code arrow}。
+ * サポートする動詞: {@code place}, {@code arrow}, {@code omit}。
  */
 public class IntentionDslParser {
 
@@ -24,6 +24,7 @@ public class IntentionDslParser {
         Objects.requireNonNull(dsl, "dsl must not be null");
         var placeList = new ArrayList<PlaceConstraint>();
         var arrowList = new ArrayList<ArrowConstraint>();
+        var omitArrowsList = new ArrayList<OmitArrowsConstraint>();
         var lines = dsl.split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
             int lineNumber = i + 1;
@@ -33,11 +34,12 @@ public class IntentionDslParser {
             switch (tokens[0]) {
                 case "place" -> placeList.add(parsePlaceStatement(tokens, lineNumber));
                 case "arrow" -> arrowList.add(parseArrowStatement(tokens, lineNumber));
+                case "omit" -> omitArrowsList.add(parseOmitStatement(tokens, lineNumber));
                 default -> throw new IntentionParseException(lineNumber,
                     "unknown verb: '" + tokens[0] + "'");
             }
         }
-        return new ParseResult(List.copyOf(placeList), List.copyOf(arrowList));
+        return new ParseResult(placeList, arrowList, omitArrowsList);
     }
 
     private PlaceConstraint parsePlaceStatement(String[] tokens, int lineNumber) {
@@ -92,6 +94,14 @@ public class IntentionDslParser {
             toEdge = parseEdge(tokens[6], lineNumber);
         }
         return new ArrowConstraint(source, target, fromEdge, toEdge, lineNumber);
+    }
+
+    private OmitArrowsConstraint parseOmitStatement(String[] tokens, int lineNumber) {
+        // omit arrows of <class>
+        if (tokens.length != 4 || !tokens[1].equals("arrows") || !tokens[2].equals("of")) {
+            throw new IntentionParseException(lineNumber, "invalid omit statement");
+        }
+        return new OmitArrowsConstraint(tokens[3], lineNumber);
     }
 
     private ArrowEdge parseEdge(String token, int lineNumber) {

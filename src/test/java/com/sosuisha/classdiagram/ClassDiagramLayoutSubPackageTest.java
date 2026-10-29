@@ -227,12 +227,16 @@ class ClassDiagramLayoutSubPackageTest {
     @Test
     void barycenterOrderingDiffersFromAlphabetical() {
         // beta.B and gamma.C both REALIZE alpha.A → alpha is pulled to the bottom by barycenter.
+        // alpha.A also composes beta.D. Without this, alpha would only be referenced by its
+        // siblings and would move to the right column instead of being ordered by barycenter.
         var alphaA = ci(ROOT + ".alpha", "A");
         var betaB  = ci(ROOT + ".beta",  "B");
+        var betaD  = ci(ROOT + ".beta",  "D");
         var gammaC = ci(ROOT + ".gamma", "C");
         var rels = List.of(
             new ClassRelation(betaB,  alphaA, DependencyType.REALIZATION, false),
-            new ClassRelation(gammaC, alphaA, DependencyType.REALIZATION, false)
+            new ClassRelation(gammaC, alphaA, DependencyType.REALIZATION, false),
+            new ClassRelation(alphaA, betaD,  DependencyType.COMPOSITION, false)
         );
         var layers = new ClassRelationSorter().sort(rels);
         var result = new ClassDiagramLayout(20, 40, 20, 20, 60)
@@ -249,5 +253,43 @@ class ClassDiagramLayoutSubPackageTest {
         // Barycenter expected order: beta above gamma above alpha (alpha at bottom).
         assertTrue(betaY < alphaY,  "barycenter places beta above alpha");
         assertTrue(gammaY < alphaY, "barycenter places gamma above alpha");
+    }
+
+    // ui and infra reference core, and core references neither, so core goes to the right column.
+    private static LayoutResult layoutWithRightColumnPackage() {
+        var ui = ci(ROOT + ".ui", "U");
+        var infra = ci(ROOT + ".infra", "I");
+        var c1 = ci(ROOT + ".core", "C1");
+        var c2 = ci(ROOT + ".core", "C2");
+        var c3 = ci(ROOT + ".core", "C3");
+        var x = ci(ROOT + ".core.x", "X");
+        var y = ci(ROOT + ".core.y", "Y");
+        var rels = List.of(rel(ui, c1), rel(ui, c2), rel(ui, c3), rel(ui, y), rel(infra, x));
+        var layers = new ClassRelationSorter().sort(rels);
+        return new ClassDiagramLayout(20, 40, 20, 20, 60)
+            .enableSubPackageGrouping(ROOT, 30)
+            .layout(layers, rels);
+    }
+
+    @Test
+    void rightColumnPackageStacksItsSubPackagesVertically() {
+        var result = layoutWithRightColumnPackage();
+        var x = result.packageGroups().stream()
+            .filter(p -> p.label().equals("x")).findFirst().orElseThrow();
+        var y = result.packageGroups().stream()
+            .filter(p -> p.label().equals("y")).findFirst().orElseThrow();
+        assertEquals(x.x(), y.x(), "sub-packages of a right-column package share one column");
+        assertNotEquals(x.y(), y.y());
+    }
+
+    @Test
+    void rightColumnPackageWrapsRowsAfterTwoClasses() {
+        var result = layoutWithRightColumnPackage();
+        var rowYs = result.boxes().stream()
+            .filter(b -> b.name().startsWith("C"))
+            .map(ClassBox::y)
+            .distinct()
+            .count();
+        assertEquals(2, rowYs, "C1, C2 and C3 must be split into two rows");
     }
 }

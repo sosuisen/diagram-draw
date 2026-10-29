@@ -952,8 +952,8 @@ Expected: 全テスト PASS
 ```java
                 .intention("""
                     place TimelineServiceFake right of TimelineServiceImpl
-                    arrow TimelineService TimelineServiceImpl from bottom
-                    arrow TimelineService TimelineServiceFake from bottom
+                    arrow TimelineServiceImpl TimelineService from bottom
+                    arrow TimelineServiceFake TimelineService from bottom
                     """)
 ```
 

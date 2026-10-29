@@ -39,6 +39,8 @@ com.sosuisha.classdiagram
     ├── ArrowConstraint.java           パース済み arrow 制約（record）
     ├── ParseResult.java               パーサー出力（PlaceConstraint + ArrowConstraint の両リスト）
     └── IntentionDslParser.java        DSL パーサー
+└── maven/
+    └── GenerateMojo.java              Maven ゴール classdiagram:generate
 ```
 
 ---
@@ -654,6 +656,67 @@ var svg = new SVGBuilder(400, 200)
     .add(new Dependency(order, item, DependencyType.COMPOSITION).edgeColor("#444"))
     .build();
 ```
+
+---
+
+## Maven プラグインとしての使用
+
+`GenerateMojo` がゴール `generate` を提供する。`ClassDiagramGenerator` の設定を Maven パラメータとして公開する薄いラッパーである。
+
+### 準備
+
+```
+mvn install
+```
+
+### コマンドラインから呼び出す
+
+```
+mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.0-SNAPSHOT:generate -Dclassdiagram.package=com.example
+```
+
+`~/.m2/settings.xml` の `<pluginGroups>` に `com.sosuisha` を追加すると、`mvn compile classdiagram:generate` と短く書ける。
+
+### pom.xml に登録する
+
+```xml
+<plugin>
+  <groupId>com.sosuisha</groupId>
+  <artifactId>classdiagram-maven-plugin</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <configuration>
+    <packageName>com.example</packageName>
+    <intentionFile>docs/diagram.intention</intentionFile>
+    <picturesque>true</picturesque>
+  </configuration>
+</plugin>
+```
+
+`<executions>` に登録した場合、デフォルトフェーズは `process-classes`。
+
+### パラメータ
+
+| パラメータ | プロパティ | デフォルト | 意味 |
+|-----------|-----------|-----------|------|
+| `packageName` | `classdiagram.package` | （必須） | 分析対象パッケージ |
+| `classesDirectory` | `classdiagram.classesDirectory` | `${project.build.outputDirectory}` | `.class` のルート |
+| `outputFile` | `classdiagram.output` | `${project.build.directory}/classdiagram.svg` | 出力 SVG |
+| `intentionFile` | `classdiagram.intentionFile` | なし | intention DSL ファイル |
+| `horizontalGap` / `verticalGap` | `classdiagram.horizontalGap` など | 30 / 50 | ボックス間隔（px） |
+| `canvasPaddingX` / `canvasPaddingY` | `classdiagram.canvasPaddingX` など | 30 / 30 | キャンバス余白（px） |
+| `groupGap` | `classdiagram.groupGap` | 60 | 連結成分グループ間隔（px） |
+| `packageGap` | `classdiagram.packageGap` | 40 | サブパッケージ枠の間隔（px）。負の値でグルーピング無効 |
+| `fontFamily` | `classdiagram.fontFamily` | なし | フォント |
+| `classFillColor` ほか色5種 | `classdiagram.classFillColor` など | なし | `ClassDiagramGenerator` の同名設定 |
+| `showDetails` | `classdiagram.showDetails` | false | フィールド・メソッドを表示 |
+| `picturesque` | `classdiagram.picturesque` | false | 装飾的描画 |
+| `skip` | `classdiagram.skip` | false | 実行をスキップ |
+
+### エラー
+
+- 対象パッケージのディレクトリがない場合は `MojoFailureException`。未コンパイルのまま空の SVG を出力するのを防ぐため。
+- intention DSL の構文エラーや循環参照も `MojoFailureException` になる。
+- Maven を実行する JVM は Java 25 以上が必要。
 
 ---
 

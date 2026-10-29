@@ -29,7 +29,9 @@ public final class Dependency implements SvgElement {
     private final ClassBox source;
     private final ClassBox target;
     private final DependencyType type;
+    private static final String FADED_OPACITY = "0.3";
     private String edgeColor = DEFAULT_EDGE_COLOR;
+    private boolean faded = false;
     private double[] customSourceAnchor;
     private double[] customSourceDir;
     private double[] customTargetAnchor;
@@ -81,6 +83,26 @@ public final class Dependency implements SvgElement {
     public Dependency edgeColor(String edgeColor) {
         this.edgeColor = Objects.requireNonNull(edgeColor, "edgeColor must not be null");
         return this;
+    }
+
+    /**
+     * 線を薄く描くかどうかを設定する。データクラスへの依存など、目立たせたくない線に使う。
+     *
+     * @param faded 薄く描く場合は {@code true}
+     * @return このDependency自身（メソッドチェーン用）
+     */
+    public Dependency faded(boolean faded) {
+        this.faded = faded;
+        return this;
+    }
+
+    /** @return 線を薄く描く場合は {@code true} */
+    public boolean faded() { return faded; }
+
+    private String openGroupTag() {
+        // Opacity instead of a lighter color, so that it works with any edgeColor.
+        return "<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\"%s>".formatted(
+            type.name().toLowerCase(), faded ? " opacity=\"" + FADED_OPACITY + "\"" : "");
     }
 
     /**
@@ -223,8 +245,7 @@ public final class Dependency implements SvgElement {
         double lineY1 = diamondCy + exitDir[1] * DIAMOND_HALF_LEN;
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
-                .formatted(type.name().toLowerCase()));
+        sb.append(openGroupTag());
         sb.append(drawDiamond(diamond));
         sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\"/>".formatted(
                 cubicBezierPath(lineX1, lineY1, exitDir, tp[0], tp[1], entryDir), edgeColor));
@@ -377,8 +398,7 @@ public final class Dependency implements SvgElement {
         double by2 = baseCy - py * TRIANGLE_HALF_WIDTH;
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
-                .formatted(type.name().toLowerCase()));
+        sb.append(openGroupTag());
         sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\" stroke-dasharray=\"8,4\"/>".formatted(
                 cubicBezierPath(sp[0], sp[1], exitDir, baseCx, baseCy, entryDir), edgeColor));
         sb.append("<polygon points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"white\" stroke=\"%s\"/>".formatted(
@@ -396,8 +416,7 @@ public final class Dependency implements SvgElement {
         double ay2 = tp[1] - ARROWHEAD_LEN * Math.sin(angle + ARROWHEAD_HALF_ANGLE);
 
         var sb = new StringBuilder();
-        sb.append("<g data-diagram-draw=\"dependency\" data-diagram-draw-type=\"%s\">"
-                .formatted(type.name().toLowerCase()));
+        sb.append(openGroupTag());
         sb.append("<path d=\"%s\" fill=\"none\" stroke=\"%s\" stroke-dasharray=\"8,4\"/>".formatted(
                 cubicBezierPath(sp[0], sp[1], exitDir, tp[0], tp[1], entryDir), edgeColor));
         sb.append("<polyline points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\" fill=\"none\" stroke=\"%s\"/>".formatted(

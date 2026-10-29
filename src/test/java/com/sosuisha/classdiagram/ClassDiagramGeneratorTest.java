@@ -411,4 +411,73 @@ class ClassDiagramGeneratorTest {
         var start = svg.indexOf("data-diagram-draw=\"package-group\" data-diagram-draw-name=\"" + label + "\"");
         return svg.substring(start, svg.indexOf("</g>", start));
     }
+
+    private static final String FIXEXC_PKG = "com.sosuisha.classdiagram.analyzer.fixexc";
+
+    @Test
+    void generateOmitsDependenciesOnExceptionClasses() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        // Only FixtureExcService -> FixtureExcData and FixtureExcRecordUser -> FixtureExcRecord remain.
+        assertEquals(2, countOccurrences(svg, "data-diagram-draw-type=\"dependency\""));
+        assertTrue(svg.contains("data-diagram-draw-name=\"FixtureExcError\""),
+            "exception classes themselves must still be drawn");
+    }
+
+    @Test
+    void generateWritesNoteWhenExceptionDependenciesAreOmitted() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        assertTrue(svg.contains("data-diagram-draw=\"note\""));
+        assertTrue(svg.contains("Dependencies on exception classes are not drawn."));
+    }
+
+    @Test
+    void generateWritesNoNoteWhenNothingIsOmitted() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXISO_PKG);
+        assertFalse(svg.contains("data-diagram-draw=\"note\""));
+    }
+
+    @Test
+    void noteFitsInsideCanvas() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        var canvas = Pattern.compile("<svg [^>]*height=\"(\\d+)\"").matcher(svg);
+        assertTrue(canvas.find());
+        var note = Pattern.compile("data-diagram-draw=\"note\" x=\"\\d+\" y=\"(\\d+)\"").matcher(svg);
+        int lastY = 0;
+        while (note.find()) {
+            lastY = Integer.parseInt(note.group(1));
+        }
+        assertTrue(lastY > 0);
+        assertTrue(lastY < Integer.parseInt(canvas.group(1)));
+    }
+
+    @Test
+    void generateWritesNoteWhenRecordDependenciesAreFaded() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        assertTrue(svg.contains("Dependencies on records are drawn as faint lines."));
+    }
+
+    @Test
+    void notesAreStackedOnSeparateLines() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        var note = Pattern.compile("data-diagram-draw=\"note\" x=\"\\d+\" y=\"(\\d+)\"").matcher(svg);
+        assertTrue(note.find());
+        int first = Integer.parseInt(note.group(1));
+        assertTrue(note.find());
+        assertTrue(Integer.parseInt(note.group(1)) > first);
+    }
+
+    @Test
+    void generateFadesDependenciesOnRecords() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"), FIXEXC_PKG);
+        assertEquals(1, countOccurrences(svg,
+            "data-diagram-draw-type=\"dependency\" opacity=\"0.3\""),
+            "only the dependency on FixtureExcRecord must be faded");
+    }
 }

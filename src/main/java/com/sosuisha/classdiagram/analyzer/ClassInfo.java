@@ -19,6 +19,8 @@ public final class ClassInfo {
     private final ClassStereotype stereotype;
     private int groupIndex;
     private final Set<String> dependencyTargetFqns = new LinkedHashSet<>();
+    private boolean exception;
+    private boolean dataClass;
 
     /**
      * ClassInfoを生成する。
@@ -85,6 +87,26 @@ public final class ClassInfo {
     public Set<String> dependencyTargetFqns() {
         return Collections.unmodifiableSet(dependencyTargetFqns);
     }
+
+    /**
+     * このクラスを例外クラス（{@link Throwable}の子孫）として記録する。{@link ClassRelationScanner} が呼び出す。
+     */
+    public void markAsException() {
+        this.exception = true;
+    }
+
+    /** @return 例外クラス（{@link Throwable}の子孫）の場合は {@code true} */
+    public boolean isException() { return exception; }
+
+    /**
+     * このクラスをデータクラス（{@code record}）として記録する。{@link ClassRelationScanner} が呼び出す。
+     */
+    public void markAsDataClass() {
+        this.dataClass = true;
+    }
+
+    /** @return データクラス（{@code record}）の場合は {@code true} */
+    public boolean isDataClass() { return dataClass; }
 
     /**
      * 完全修飾名からClassInfoを生成する（stereotype = NONE）。

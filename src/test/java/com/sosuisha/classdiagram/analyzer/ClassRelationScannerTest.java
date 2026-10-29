@@ -241,4 +241,33 @@ class ClassRelationScannerTest {
         assertTrue(result.classes().isEmpty());
         assertTrue(result.relations().isEmpty());
     }
+
+    private static final String FIXEXC_PKG = "com.sosuisha.classdiagram.analyzer.fixexc";
+
+    @Test
+    void scanMarksSubclassOfJdkExceptionAsException() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXEXC_PKG);
+        assertTrue(findClass(result, "FixtureExcError").isException());
+        assertTrue(findClass(result, "FixtureExcBase").isException());
+    }
+
+    @Test
+    void scanMarksExceptionWhoseSuperclassIsInScannedPackage() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXEXC_PKG);
+        assertTrue(findClass(result, "FixtureExcChild").isException());
+    }
+
+    @Test
+    void scanDoesNotMarkPlainClassAsException() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXEXC_PKG);
+        assertFalse(findClass(result, "FixtureExcData").isException());
+        assertFalse(findClass(result, "FixtureExcService").isException());
+    }
+
+    @Test
+    void scanMarksRecordAsDataClass() {
+        var result = new ClassRelationScanner().scanAll(CLASS_ROOT, FIXEXC_PKG);
+        assertTrue(findClass(result, "FixtureExcRecord").isDataClass());
+        assertFalse(findClass(result, "FixtureExcData").isDataClass());
+    }
 }

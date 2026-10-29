@@ -266,6 +266,7 @@ public class ClassDiagramGenerator {
         result.packageGroups().forEach(builder::add);
         result.boxes().forEach(builder::add);
         result.dependencies().forEach(builder::add);
+        result.notes().forEach(builder::add);
         return builder.build();
     }
 

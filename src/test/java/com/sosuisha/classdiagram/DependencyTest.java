@@ -224,4 +224,25 @@ class DependencyTest {
         dep.setTargetEdgeOverride(Dependency.BoxEdge.TOP);
         assertTrue(dep.isTargetEdgeOverridden());
     }
+
+    @Test
+    void fadedDependencyHasLowOpacity() {
+        var a = new ClassBox("A");
+        a.setPosition(0, 0);
+        var b = new ClassBox("B");
+        b.setPosition(0, 200);
+        var svg = new Dependency(a, b, DependencyType.DEPENDENCY).faded(true).draw();
+        assertTrue(svg.contains("opacity=\"0.3\""));
+    }
+
+    @Test
+    void dependencyIsNotFadedByDefault() {
+        var a = new ClassBox("A");
+        a.setPosition(0, 0);
+        var b = new ClassBox("B");
+        b.setPosition(0, 200);
+        var dep = new Dependency(a, b, DependencyType.COMPOSITION);
+        assertFalse(dep.draw().contains("opacity="));
+        assertFalse(dep.faded());
+    }
 }

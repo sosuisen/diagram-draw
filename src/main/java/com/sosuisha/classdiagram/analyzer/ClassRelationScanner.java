@@ -73,6 +73,7 @@ public class ClassRelationScanner {
     private ScanResult analyzeRelations(Path classRoot, Set<String> targetClassNames) {
         var stereotypes = collectStereotypes(classRoot, targetClassNames);
         var classInfoCache = buildClassInfoCache(targetClassNames, stereotypes);
+        markClassKinds(classRoot, classInfoCache);
         var relations = new ArrayList<ClassRelation>();
 
         for (var className : targetClassNames) {
@@ -136,6 +137,54 @@ public class ClassRelationScanner {
                 stereotypes.getOrDefault(className, ClassStereotype.NONE)));
         }
         return cache;
+    }
+
+    private static void markClassKinds(Path classRoot, Map<String, ClassInfo> classInfoCache) {
+        classInfoCache.forEach((className, info) -> {
+            if ("java.lang.Record".equals(superclassOf(classRoot, className))) {
+                info.markAsDataClass();
+            }
+            if (isThrowable(classRoot, className)) {
+                info.markAsException();
+            }
+        });
+    }
+
+    private static boolean isThrowable(Path classRoot, String className) {
+        var visited = new HashSet<String>();
+        var current = className;
+        while (current != null && visited.add(current)) {
+            if (!Files.exists(classFilePath(classRoot, current))) {
+                return isJdkThrowable(current);
+            }
+            current = superclassOf(classRoot, current);
+        }
+        return false;
+    }
+
+    private static boolean isJdkThrowable(String className) {
+        try {
+            // initialize = false: the check must not run static initializers.
+            var type = Class.forName(className, false, ClassLoader.getPlatformClassLoader());
+            return Throwable.class.isAssignableFrom(type);
+        } catch (ClassNotFoundException | LinkageError e) {
+            // A superclass from a third-party library is not on our class path.
+            return false;
+        }
+    }
+
+    private static String superclassOf(Path classRoot, String className) {
+        try {
+            return ClassFile.of().parse(classFilePath(classRoot, className)).superclass()
+                .map(entry -> internalNameToBinary(entry.asInternalName()))
+                .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static Path classFilePath(Path classRoot, String className) {
+        return classRoot.resolve(className.replace('.', '/') + ".class");
     }
 
     private Map<String, ClassStereotype> collectStereotypes(Path classRoot, Set<String> targetClassNames) {

@@ -411,10 +411,16 @@ public class ClassDiagramLayout {
             relatedInfos.add(rel.sourceClassInfo());
             relatedInfos.add(rel.targetClassInfo());
         }
+        int omittedExceptionDependencies = 0;
         for (var srcInfo : boxMap.keySet()) {
             for (var fqn : srcInfo.dependencyTargetFqns()) {
                 var tgtInfo = fqnToInfo.get(fqn);
                 if (tgtInfo == null) continue;
+                // Almost every class may throw; these lines add noise but little structure.
+                if (tgtInfo.isException()) {
+                    omittedExceptionDependencies++;
+                    continue;
+                }
                 // Classes without relations share one group but are not connected by
                 // any other line, so dependencies between them must still be drawn.
                 if (srcInfo.groupIndex() == tgtInfo.groupIndex() && relatedInfos.contains(srcInfo)) continue;
@@ -422,7 +428,9 @@ public class ClassDiagramLayout {
                 var src = boxMap.get(srcInfo);
                 var tgt = boxMap.get(tgtInfo);
                 if (src != null && tgt != null) {
-                    dependencies.add(new Dependency(src, tgt, DependencyType.DEPENDENCY).edgeColor(edgeColor));
+                    dependencies.add(new Dependency(src, tgt, DependencyType.DEPENDENCY)
+                        .edgeColor(edgeColor)
+                        .faded(tgtInfo.isDataClass()));
                 }
             }
         }
@@ -454,12 +462,30 @@ public class ClassDiagramLayout {
         applyArrowConstraints(dependencies, omittedNames);
         spreadDependencyEndpoints(dependencies);
 
+        var noteTexts = new ArrayList<String>();
+        if (omittedExceptionDependencies > 0) {
+            noteTexts.add(EXCEPTION_DEPENDENCIES_NOTE);
+        }
+        if (dependencies.stream().anyMatch(Dependency::faded)) {
+            noteTexts.add(RECORD_DEPENDENCIES_NOTE);
+        }
+        var notes = new ArrayList<DiagramNote>();
+        int noteY = canvasHeight - canvasPaddingY + NOTE_MARGIN_TOP + NOTE_ASCENT;
+        for (var text : noteTexts) {
+            var note = new DiagramNote(text, canvasPaddingX, noteY);
+            notes.add(note);
+            canvasHeight = note.y() + canvasPaddingY;
+            canvasWidth = Math.max(canvasWidth, note.x() + note.width() + canvasPaddingX);
+            noteY += NOTE_LINE_HEIGHT;
+        }
+
         return new LayoutResult(
             List.copyOf(boxMap.values()),
             List.copyOf(dependencies),
             List.copyOf(packageGroups),
             canvasWidth,
-            canvasHeight
+            canvasHeight,
+            notes
         );
     }
 
@@ -989,6 +1015,11 @@ public class ClassDiagramLayout {
     private static final double EDGE_SPREAD_MARGIN_MAX = 20.0;
     private static final double EDGE_SPREAD_MARGIN_RATIO = 0.15;
     private static final int COLUMN_MODE_MAX_CLASSES_PER_ROW = 2;
+    private static final String EXCEPTION_DEPENDENCIES_NOTE = "Dependencies on exception classes are not drawn.";
+    private static final int NOTE_MARGIN_TOP = 20;
+    private static final int NOTE_ASCENT = 10;
+    private static final int NOTE_LINE_HEIGHT = 16;
+    private static final String RECORD_DEPENDENCIES_NOTE = "Dependencies on records are drawn as faint lines.";
 
     private record AnchorInfo(
         Dependency dep, boolean isSource, ClassBox box,

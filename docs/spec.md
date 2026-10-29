@@ -18,6 +18,7 @@ com.sosuisha.classdiagram
 ├── ClassStereotype.java         ステレオタイプ列挙型（NONE, INTERFACE）
 ├── ClassBox.java                クラスボックス（SVG要素）
 ├── PackageGroupBox.java         パッケージ矩形（UMLタブ付きフォルダ形状、SVG要素）
+├── DiagramNote.java             図の下の注記（SVG要素）
 ├── Dependency.java              関係線（SVG要素）
 ├── DependencyType.java          関係の種類（列挙型）
 ├── SVGBuilder.java              SVGドキュメントビルダー
@@ -164,10 +165,10 @@ box.fillColor(); box.strokeColor();   // 色
   - フィールドかメソッドのみ存在: `1.5`
   - 両方存在: `2.0`
 - `picturesque(true)` 時は輪郭線を 1px シフトした2本目のスケッチ線で重ね描き（手描きの重ね書きを模倣）
-
 - 乱数のシードは内容のハッシュ値（名前のみ表示なら `name`、詳細表示なら `name, stereotype, fields, methods`）に、図全体のシード `seed(long)` を混ぜて作る。混ぜ方は `SketchSeed.mix(hash, seed) = hash + seed * 0x9E3779B97F4A7C15L`。`seed = 0` のときは内容のハッシュ値と一致する
 - `PackageGroupBox` も同じ方法で、`label, width, height` のハッシュ値に `seed` を混ぜる
 - Maven プラグインでは、`seed` は常に `(groupId + ":" + artifactId).hashCode()`。`String.hashCode()` は Java の仕様で計算方法が決まっているため、JDK や OS が違っても同じ揺れ方になる。利用者は変更できない
+
 ---
 
 ### `PackageGroupBox` クラス
@@ -250,7 +251,7 @@ dep.source(); dep.target(); dep.type();
 #### `draw()` の出力構造
 
 ```xml
-<g data-diagram-draw="dependency" data-diagram-draw-type="{type}">
+<g data-diagram-draw="dependency" data-diagram-draw-type="{type}"[ opacity="0.3"]>
   <!-- COMPOSITION / AGGREGATION:
        <polygon ... fill="(edgeColor|white)"/>  ダイアモンド
        <path d="M ... C ..." fill="none"/>       三次ベジエ曲線 -->
@@ -264,6 +265,8 @@ dep.source(); dep.target(); dep.type();
 ```
 
 `data-diagram-draw-type` の値: `"composition"` / `"aggregation"` / `"realization"` / `"dependency"`
+
+`faded(true)` を設定すると、`<g>` に `opacity="0.3"` を付けて線を薄く描く。
 
 #### 描画アルゴリズム
 
@@ -334,9 +337,13 @@ info.groupIndex();                                              // デフォル�
 info.setGroupIndex(1);                                          // ConnectedComponentSplitter が設定
 info.addDependencyTargetFqn("com.example.Helper");              // ClassRelationScanner が設定
 info.dependencyTargetFqns();                                    // 不変 Set<String>
+info.markAsException(); info.isException();                     // Throwable の子孫
+info.markAsDataClass(); info.isDataClass();                     // record
 ```
 
-`equals` / `hashCode` は `packageName + simpleName + stereotype` のみ（`groupIndex` および `dependencyTargetFqns` は同一性に含まれない）。
+`equals` / `hashCode` は `packageName + simpleName + stereotype` のみ（`groupIndex`、`dependencyTargetFqns`、例外・データクラスの印は同一性に含まれない）。
+
+`ClassRelationScanner` は例外とデータクラスの印を付ける。例外は `Throwable` の子孫のクラスである。スーパークラスを classRoot 内のクラスファイルでたどる。classRoot にないクラスは、プラットフォームクラスローダーで初期化せずに読み込んで判定する。データクラスは `java.lang.Record` を直接継承するクラス（record）である。
 
 ---
 
@@ -457,11 +464,12 @@ public record LayoutResult(
     List<Dependency> dependencies,         // 生成されたDependency一覧
     List<PackageGroupBox> packageGroups,   // PackageGroupBox一覧（無効時は空リスト）
     int canvasWidth,
-    int canvasHeight
+    int canvasHeight,
+    List<DiagramNote> notes                // 図の下に書く注記（なければ空リスト）
 )
 ```
 
-後方互換用に `(boxes, dependencies, canvasWidth, canvasHeight)` の4引数コンストラクタも提供。`packageGroups` は空リスト扱い。
+`notes` を空リストにする5引数コンストラクタもある。後方互換用に `(boxes, dependencies, canvasWidth, canvasHeight)` の4引数コンストラクタも提供。`packageGroups` は空リスト扱い。
 
 ---
 
@@ -560,6 +568,7 @@ public ClassDiagramGenerator(int horizontalGap, int verticalGap,
 .edgeColor(String)
 .showDetails()
 .picturesque(boolean)
+.seed(long)                            // 揺らぎのシード（既定 0）
 .intention(String dsl)                 // intention DSL 文字列
 .intentionFile(Path path)              // intention DSL ファイル（intention() より優先）
 
@@ -568,7 +577,6 @@ public String generate(Path classRoot, String packageName)
 
 #### 内部パイプライン
 
-.seed(long)                            // 揺らぎのシード（既定 0）
 ```
 ClassRelationScanner.scanAll()
         ↓ ScanResult (classes, relations)
@@ -594,6 +602,12 @@ SVGBuilder
 
 DEPENDENCY 矢印は通常、異なるグループ間にのみ描く。ただし、関係を持たないクラスから出る依存は、同じ追加グループ内でも描く。ほかの線でつながっていないため。
 
+例外クラスへの DEPENDENCY 矢印は描かない。多くのクラスが例外を投げたり捕まえたりするため、線が増えるだけで構造が読み取りにくくなる。1本以上省いた場合は、図の左下に注記 `Dependencies on exception classes are not drawn.` を書く。注記の分だけキャンバスを下に広げる。注記が図より長いときは横にも広げる。
+
+record への DEPENDENCY 矢印は `faded(true)` で薄く描く。record は主にデータを運ぶため、依存の重要度が低い。薄い線が1本以上あれば、注記 `Dependencies on records are drawn as faint lines.` を書く。
+
+注記が2つあるときは、例外の注記を上、record の注記を下にして、16px間隔で縦に並べる。
+
 `enableSubPackageGrouping` は `ClassDiagramLayout` 側に `packageName` を渡して有効化する。
 
 ---
@@ -614,6 +628,7 @@ DEPENDENCY 矢印は通常、異なるグループ間にのみ描く。ただし
 | `data-diagram-draw-type="aggregation"` | 集約関係線 |
 | `data-diagram-draw-type="realization"` | 実現（implements）関係線 |
 | `data-diagram-draw-type="dependency"` | 依存関係線 |
+| `data-diagram-draw="note"` | 図の下の注記（`DiagramNote`） |
 
 ---
 

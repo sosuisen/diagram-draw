@@ -174,4 +174,24 @@ class ClassRelationScannerTest {
         assertTrue(ifaceInfo.dependencyTargetFqns().contains(FIXDEP_PKG + ".FixtureDepTarget"),
                 "FixtureDepInterface.handle(FixtureDepTarget) must add FixtureDepTarget to dependencyTargetFqns");
     }
+
+    private static final String FIXSELF_PKG = "com.sosuisha.classdiagram.analyzer.fixself";
+
+    @Test
+    void scanExcludesFieldOfOwnType() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXSELF_PKG);
+        assertTrue(relations.stream().noneMatch(
+                r -> r.sourceClassInfo().simpleName().equals(r.targetClassInfo().simpleName())),
+                "FixtureSelfSettings.DEFAULT must not create a relation to itself");
+    }
+
+    @Test
+    void scanKeepsFieldRelationOfClassWithFieldOfOwnType() {
+        var relations = new ClassRelationScanner().scan(CLASS_ROOT, FIXSELF_PKG);
+        assertTrue(relations.stream().anyMatch(
+                r -> r.sourceClassInfo().simpleName().equals("FixtureSelfSettings")
+                        && r.targetClassInfo().simpleName().equals("FixtureSelfPart")
+                        && r.type() == DependencyType.AGGREGATION),
+                "FixtureSelfSettings.part must still be detected");
+    }
 }

@@ -378,6 +378,7 @@ List<ClassRelation> scan(Path classRoot, String packageName)
 | **DEPENDENCY** | メソッドのパラメータ型／ジェネリックパラメータ／ローカル変数型がターゲットパッケージ内のクラス（自分自身およびフィールド型を除く） |
 
 - `ACC_ENUM` フラグを持つフィールド（enum 定数）は対象外（自己参照による誤検出を防ぐため）
+- 自クラスと同じ型のフィールド（`DEFAULT` 定数やシングルトンの `INSTANCE` など）は対象外（自己ループがトポロジカルソートで循環と判定されるため）
 - コレクション型（`List<T>` 等）のフィールドはジェネリック引数を見て `isMany = true`
 - 両クラスが同一スキャンパッケージ内に存在する場合のみ関係を生成
 
@@ -727,6 +728,7 @@ mvn compile com.sosuisha:classdiagram-maven-plugin:1.0.0-SNAPSHOT:generate -Dcla
 - 異なるスキャンパッケージ間の関係は生成しない（同一 `packageName` 配下のみ）
 - クラス継承（`extends`）は未対応
 - enum 定数（`ACC_ENUM` フラグを持つフィールド）は COMPOSITION/AGGREGATION の検出対象外（自己参照フィールドによる誤検出を防ぐため）。通常の `static` フィールドは対象
+- 自クラスと同じ型のフィールドは COMPOSITION/AGGREGATION の検出対象外（`static` かどうかを問わない）
 
 ---
 

@@ -247,4 +247,12 @@ class ClassDiagramGeneratorTest {
         assertNotEquals(svgDslOnly, svgFileOverride,
             "intentionFile must override intention() when both are set");
     }
+
+    @Test
+    void generateSucceedsForClassWithStaticFieldOfOwnType() {
+        var svg = new ClassDiagramGenerator(20, 40, 20, 20, 60)
+            .generate(Path.of("target/test-classes"),
+                      "com.sosuisha.classdiagram.analyzer.fixself");
+        assertTrue(svg.contains("FixtureSelfSettings"));
+    }
 }

@@ -78,6 +78,9 @@ public class ClassRelationScanner {
                 if (field.flags().has(AccessFlag.ENUM)) continue;
                 var resolved = resolveFieldTarget(field, targetClassNames);
                 if (resolved == null) continue;
+                // A field of the own type, such as a DEFAULT constant, would make a self-loop
+                // that the topological sort reports as a circular relation.
+                if (resolved.targetClassName().equals(className)) continue;
                 fieldFqns.add(resolved.targetClassName());
 
                 var targetInfo = classInfoCache.get(resolved.targetClassName());

@@ -184,3 +184,7 @@ Also check that `classdiagram.package` is correct.
 
 Maven is running on an old JDK.
 Run Maven with JDK 25 or later.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
